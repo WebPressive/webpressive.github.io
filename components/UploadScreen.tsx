@@ -252,7 +252,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             </a>
           </div>
           <div className="text-sm text-neutral-600">
-            <span>Copyright (c) </span>
+            <span>Copyright (c) 2026 </span>
             <a 
               href="https://hsbank.info" 
               target="_blank" 
