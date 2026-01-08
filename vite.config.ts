@@ -6,7 +6,8 @@ export default defineConfig(({ mode }) => {
     // For GitHub Pages: if deploying to a repository (not user/organization site),
     // set base to '/repository-name/', otherwise use '/'
     // This will be overridden by environment variable if set
-    const base = process.env.GITHUB_PAGES_BASE || '/';
+    // For WebPressive organization: https://webpressive.github.io/webpressive/
+    const base = process.env.GITHUB_PAGES_BASE || '/webpressive/';
     
     return {
       base: base,

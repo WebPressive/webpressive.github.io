@@ -4,7 +4,7 @@
 
 A web-based presentation tool for Beamer PDFs with dual-screen support, speaker notes, and spotlight features.
 
-🌐 **Live Demo**: [View on GitHub Pages](https://beamerpdf.github.io/webpressive/) *(Update this URL after deployment)*
+🌐 **Live Demo**: [View on GitHub Pages](https://webpressive.github.io/webpressive/)
 
 ## Run Locally
 
