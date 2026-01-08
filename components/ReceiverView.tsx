@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SlideData, SyncMessage, AppMode } from '../types';
 import SpotlightLayer from './SpotlightLayer';
+import LaserPointer from './LaserPointer';
 import { clsx } from 'clsx';
 
 const ReceiverView: React.FC = () => {
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isSpotlight, setIsSpotlight] = useState(false);
+  const [isLaser, setIsLaser] = useState(false);
+  const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [mode, setMode] = useState<AppMode>(AppMode.PRESENTATION);
+  const receiverContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const channel = new BroadcastChannel('webpressive_sync');
@@ -43,6 +47,12 @@ const ReceiverView: React.FC = () => {
         setCurrentIndex(msg.index);
         setIsSpotlight(msg.isSpotlight);
         setMode(msg.mode);
+        if (msg.isLaserActive !== undefined) {
+          setIsLaser(msg.isLaserActive);
+        }
+        if (msg.laserPosition !== undefined) {
+          setLaserPosition(msg.laserPosition);
+        }
       }
     };
 
@@ -63,7 +73,7 @@ const ReceiverView: React.FC = () => {
   // The receiver mimics the logic of the main App for displaying slides
   // But without controls or overview interactions
   return (
-    <div className={clsx("relative w-full h-screen bg-black overflow-hidden select-none", isSpotlight ? "cursor-none" : "cursor-default")}>
+    <div ref={receiverContainerRef} className={clsx("relative w-full h-screen bg-black overflow-hidden select-none receiver-container", isSpotlight ? "cursor-none" : "cursor-default")}>
       <AnimatePresence mode="wait">
         {mode === AppMode.PRESENTATION && (
           <motion.div
@@ -108,6 +118,7 @@ const ReceiverView: React.FC = () => {
       </AnimatePresence>
 
       <SpotlightLayer isActive={isSpotlight} />
+      <LaserPointer isActive={isLaser} position={laserPosition} containerRef={receiverContainerRef} />
     </div>
   );
 };

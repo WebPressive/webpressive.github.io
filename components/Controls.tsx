@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -8,9 +8,11 @@ interface ControlsProps {
   totalSlides: number;
   mode: AppMode;
   isSpotlight: boolean;
+  isLaser?: boolean;
   startTime: number | null;
   toggleOverview: () => void;
   toggleSpotlight: () => void;
+  toggleLaser?: () => void;
   toggleDualScreen?: () => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -22,9 +24,11 @@ const Controls: React.FC<ControlsProps> = ({
   totalSlides,
   mode,
   isSpotlight,
+  isLaser = false,
   startTime,
   toggleOverview,
   toggleSpotlight,
+  toggleLaser,
   toggleDualScreen,
   nextSlide,
   prevSlide,
@@ -123,6 +127,16 @@ const Controls: React.FC<ControlsProps> = ({
         >
           <Sun className="w-5 h-5" />
         </button>
+
+        {toggleLaser && (
+          <button 
+            onClick={toggleLaser} 
+            className={clsx("p-2 rounded-xl transition-colors", isLaser ? "bg-red-600 text-white" : "hover:bg-white/10")}
+            title="Laser Pointer (L)"
+          >
+            <MousePointer2 className="w-5 h-5" />
+          </button>
+        )}
         
         {toggleDualScreen && (
           <button 

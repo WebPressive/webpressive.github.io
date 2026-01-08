@@ -4,6 +4,7 @@ import { SlideData, AppMode, SyncMessage } from './types';
 import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
 import SpotlightLayer from './components/SpotlightLayer';
+import LaserPointer from './components/LaserPointer';
 import ReceiverView from './components/ReceiverView';
 import { clsx } from 'clsx';
 
@@ -21,6 +22,8 @@ const App: React.FC = () => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [mode, setMode] = useState<AppMode>(AppMode.UPLOAD);
   const [isSpotlightActive, setIsSpotlightActive] = useState(false);
+  const [isLaserActive, setIsLaserActive] = useState(false);
+  const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   
   // Dual Screen State
@@ -31,6 +34,10 @@ const App: React.FC = () => {
   const [mainWidth, setMainWidth] = useState(66.67); // Percentage
   const [nextHeight, setNextHeight] = useState(60); // Percentage of sidebar
   const [isResizing, setIsResizing] = useState<string | null>(null);
+  
+  // Refs for laser pointer containers
+  const presenterSlideRef = useRef<HTMLDivElement>(null);
+  const normalViewRef = useRef<HTMLDivElement>(null);
 
   // --- Dual Screen / Broadcasting Logic ---
   useEffect(() => {
@@ -53,13 +60,15 @@ const App: React.FC = () => {
           type: 'STATE_UPDATE',
           index: currentSlideIndex,
           isSpotlight: isSpotlightActive,
-          mode: mode
+          mode: mode,
+          isLaserActive: isLaserActive,
+          laserPosition: laserPosition
         });
       }
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, mode]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition]);
 
   // Broadcast state changes
   useEffect(() => {
@@ -68,10 +77,12 @@ const App: React.FC = () => {
         type: 'STATE_UPDATE',
         index: currentSlideIndex,
         isSpotlight: isSpotlightActive,
-        mode: mode
+        mode: mode,
+        isLaserActive: isLaserActive,
+        laserPosition: laserPosition
       });
     }
-  }, [currentSlideIndex, isSpotlightActive, mode, isReceiver]);
+  }, [currentSlideIndex, isSpotlightActive, mode, isReceiver, isLaserActive, laserPosition]);
 
   const openDualScreen = () => {
     window.open(`${window.location.pathname}?mode=receiver`, 'WebPressiveReceiver', 'width=800,height=600');
@@ -107,8 +118,63 @@ const App: React.FC = () => {
   const toggleSpotlight = useCallback(() => {
     if (mode === AppMode.PRESENTATION) {
       setIsSpotlightActive((prev) => !prev);
+      // Turn off laser when spotlight is activated
+      if (!isSpotlightActive) {
+        setIsLaserActive(false);
+      }
     }
-  }, [mode]);
+  }, [mode, isSpotlightActive]);
+
+  const toggleLaser = useCallback(() => {
+    if (mode === AppMode.PRESENTATION) {
+      setIsLaserActive((prev) => !prev);
+      // Turn off spotlight when laser is activated
+      if (!isLaserActive) {
+        setIsSpotlightActive(false);
+      }
+    }
+  }, [mode, isLaserActive]);
+
+  // Track mouse position for laser pointer (normalized relative to image bounds)
+  useEffect(() => {
+    if (!isLaserActive || mode !== AppMode.PRESENTATION) {
+      setLaserPosition(null);
+      return;
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Find the image element to get its actual rendered bounds
+      const container = document.querySelector('.presenter-container') || document.body;
+      const img = container.querySelector('img[class*="object-contain"]') as HTMLImageElement;
+      
+      if (img) {
+        const rect = img.getBoundingClientRect();
+        // Calculate position relative to the image bounds
+        const relativeX = (e.clientX - rect.left) / rect.width;
+        const relativeY = (e.clientY - rect.top) / rect.height;
+        
+        // Only update if mouse is within image bounds
+        if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
+          setLaserPosition({ x: relativeX, y: relativeY });
+        }
+      } else {
+        // Fallback: try to find image in normal presentation view
+        const normalImg = document.querySelector('img[class*="object-contain"]') as HTMLImageElement;
+        if (normalImg) {
+          const rect = normalImg.getBoundingClientRect();
+          const relativeX = (e.clientX - rect.left) / rect.width;
+          const relativeY = (e.clientY - rect.top) / rect.height;
+          
+          if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
+            setLaserPosition({ x: relativeX, y: relativeY });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isLaserActive, mode]);
 
   // Resize handlers (must be before any conditional returns)
   const handleResizeStart = useCallback((type: string) => {
@@ -175,6 +241,10 @@ const App: React.FC = () => {
         case 's': 
           toggleSpotlight();
           break;
+        case 'l':
+        case 'L':
+          toggleLaser();
+          break;
         case 'f':
         case 'F':
           if (!document.fullscreenElement) {
@@ -186,13 +256,14 @@ const App: React.FC = () => {
         case 'Escape':
           if (mode === AppMode.OVERVIEW) setMode(AppMode.PRESENTATION);
           else if (isSpotlightActive) setIsSpotlightActive(false);
+          else if (isLaserActive) setIsLaserActive(false);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, isSpotlightActive]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, isSpotlightActive, isLaserActive]);
 
   // --- Render Logic ---
 
@@ -215,6 +286,7 @@ const App: React.FC = () => {
             
             {/* Main Slide (Left, Resizable) */}
             <div 
+              ref={presenterSlideRef}
               className="bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700"
               style={{ width: `${mainWidth}%` }}
             >
@@ -227,6 +299,7 @@ const App: React.FC = () => {
                  LIVE ON PROJECTOR
                </div>
                <SpotlightLayer isActive={isSpotlightActive} />
+               <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={presenterSlideRef} />
             </div>
             
             {/* Resize Handle (Vertical) */}
@@ -302,9 +375,11 @@ const App: React.FC = () => {
                 totalSlides={slides.length}
                 mode={mode}
                 isSpotlight={isSpotlightActive}
+                isLaser={isLaserActive}
                 startTime={startTime}
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
+                toggleLaser={toggleLaser}
                 toggleDualScreen={openDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
@@ -316,7 +391,7 @@ const App: React.FC = () => {
 
   // --- Normal Presentation View ---
   return (
-    <div className="w-full h-screen bg-black text-white relative overflow-hidden">
+    <div ref={normalViewRef} className="w-full h-screen bg-black text-white relative overflow-hidden normal-presentation-container">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlideIndex}
@@ -332,6 +407,7 @@ const App: React.FC = () => {
             alt={slides[currentSlideIndex].name}
           />
           <SpotlightLayer isActive={isSpotlightActive} />
+          <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={normalViewRef} />
         </motion.div>
       </AnimatePresence>
 
@@ -340,9 +416,11 @@ const App: React.FC = () => {
         totalSlides={slides.length}
         mode={mode}
         isSpotlight={isSpotlightActive}
+        isLaser={isLaserActive}
         startTime={startTime}
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
+        toggleLaser={toggleLaser}
         toggleDualScreen={openDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}
