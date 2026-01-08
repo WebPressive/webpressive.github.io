@@ -2,9 +2,9 @@
 
 # WebPressive
 
-A web-based presentation tool for Beamer PDFs with dual-screen support, speaker notes, and spotlight features.
+A dual-screen presenter for LaTeX Beamer PDFs.
 
-🌐 **Live Demo**: [View on GitHub Pages](https://webpressive.github.io/webpressive/)
+🌐 **Live Demo**: [View on GitHub Pages](https://webpressive.github.io)
 
 ## Run Locally
 

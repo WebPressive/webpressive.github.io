@@ -54,14 +54,14 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-8">
+    <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-8 relative">
       <div className="max-w-2xl w-full text-center space-y-12">
         <div className="space-y-4">
           <h1 className="text-6xl font-black tracking-tighter bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             WebPressive
           </h1>
           <p className="text-xl text-neutral-400">
-            A web-based tribute to the legendary presentation tool.
+            A dual-screen presenter for LaTeX Beamer PDFs.
           </p>
         </div>
 
@@ -121,9 +121,39 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <span>Spotlight</span>
           </div>
           <div className="flex items-center space-x-2">
+            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">L</span>
+            <span>Laser Pointer</span>
+          </div>
+          <div className="flex items-center space-x-2">
             <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">F</span>
             <span>Fullscreen</span>
           </div>
+        </div>
+      </div>
+
+      {/* Footer - positioned at bottom */}
+      <div className="absolute bottom-8 left-0 right-0 text-center space-y-2">
+        <div className="text-sm text-neutral-600">
+          <span>Inspired by </span>
+          <a 
+            href="https://impressive.sourceforge.net/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors underline"
+          >
+            Impressive
+          </a>
+        </div>
+        <div className="text-sm text-neutral-600">
+          <span>Copyright (c) </span>
+          <a 
+            href="https://hsbank.info" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            Sinan Bank
+          </a>
         </div>
       </div>
     </div>
