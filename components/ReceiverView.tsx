@@ -10,6 +10,7 @@ const ReceiverView: React.FC = () => {
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isSpotlight, setIsSpotlight] = useState(false);
+  const [spotlightPosition, setSpotlightPosition] = useState<{ x: number; y: number } | null>(null);
   const [isLaser, setIsLaser] = useState(false);
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [mode, setMode] = useState<AppMode>(AppMode.PRESENTATION);
@@ -48,6 +49,9 @@ const ReceiverView: React.FC = () => {
       } else if (msg.type === 'STATE_UPDATE') {
         setCurrentIndex(msg.index);
         setIsSpotlight(msg.isSpotlight);
+        if (msg.spotlightPosition !== undefined) {
+          setSpotlightPosition(msg.spotlightPosition);
+        }
         setMode(msg.mode);
         if (msg.isLaserActive !== undefined) {
           setIsLaser(msg.isLaserActive);
@@ -132,7 +136,14 @@ const ReceiverView: React.FC = () => {
          )}
       </AnimatePresence>
 
-      <SpotlightLayer isActive={isSpotlight} />
+      <SpotlightLayer 
+        isActive={isSpotlight} 
+        position={spotlightPosition}
+        containerRef={receiverContainerRef}
+        zoomLevel={zoomState.level}
+        panX={zoomState.panX}
+        panY={zoomState.panY}
+      />
       <LaserPointer 
         isActive={isLaser} 
         position={laserPosition} 

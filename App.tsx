@@ -25,8 +25,11 @@ const App: React.FC = () => {
   // --- State ---
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [overviewHighlightIndex, setOverviewHighlightIndex] = useState(0); // Highlighted slide in overview mode
+  const overviewSlideRefs = useRef<(HTMLDivElement | null)[]>([]); // Refs for overview slides
   const [mode, setMode] = useState<AppMode>(AppMode.UPLOAD);
   const [isSpotlightActive, setIsSpotlightActive] = useState(false);
+  const [spotlightPosition, setSpotlightPosition] = useState<{ x: number; y: number } | null>(null);
   const [isLaserActive, setIsLaserActive] = useState(false);
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [showAbout, setShowAbout] = useState(false);
@@ -76,10 +79,11 @@ const App: React.FC = () => {
           startTime: startTime
         });
         // Send current state immediately (including zoom)
-        channel.postMessage({
+          channel.postMessage({
           type: 'STATE_UPDATE',
           index: currentSlideIndex,
           isSpotlight: isSpotlightActive,
+          spotlightPosition: spotlightPosition,
           mode: mode,
           isLaserActive: isLaserActive,
           laserPosition: laserPosition,
@@ -89,7 +93,7 @@ const App: React.FC = () => {
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition, zoomState]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState]);
 
   // Broadcast state changes
   useEffect(() => {
@@ -98,13 +102,14 @@ const App: React.FC = () => {
         type: 'STATE_UPDATE',
         index: currentSlideIndex,
         isSpotlight: isSpotlightActive,
+        spotlightPosition: spotlightPosition,
         mode: mode,
         isLaserActive: isLaserActive,
         laserPosition: laserPosition,
         zoomState: zoomState
       });
     }
-  }, [currentSlideIndex, isSpotlightActive, mode, isReceiver, isLaserActive, laserPosition, zoomState]);
+  }, [currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isReceiver, isLaserActive, laserPosition, zoomState]);
 
   const openDualScreen = () => {
     window.open(`${window.location.pathname}?mode=receiver`, 'WebPressiveReceiver', 'width=800,height=600');
@@ -149,6 +154,7 @@ const App: React.FC = () => {
             type: 'STATE_UPDATE',
             index: currentSlideIndex,
             isSpotlight: isSpotlightActive,
+            spotlightPosition: spotlightPosition,
             mode: mode,
             isLaserActive: isLaserActive,
             laserPosition: laserPosition,
@@ -179,13 +185,14 @@ const App: React.FC = () => {
         type: 'STATE_UPDATE',
         index: currentSlideIndex,
         isSpotlight: isSpotlightActive,
+        spotlightPosition: spotlightPosition,
         mode: mode,
         isLaserActive: isLaserActive,
         laserPosition: laserPosition,
         zoomState: { level: 1.0, panX: 0, panY: 0 },
       } as SyncMessage);
     }
-  }, [zoomedSlideSrc, slides, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition]);
+  }, [zoomedSlideSrc, slides, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition]);
 
   const nextSlide = useCallback(() => {
     setCurrentSlideIndex((prev) => Math.min(prev + 1, slides.length - 1));
@@ -198,9 +205,25 @@ const App: React.FC = () => {
   }, [resetZoom]);
 
   const toggleOverview = useCallback(() => {
-    setMode((prev) => (prev === AppMode.PRESENTATION ? AppMode.OVERVIEW : AppMode.PRESENTATION));
+    setMode((prev) => {
+      if (prev === AppMode.PRESENTATION) {
+        // Entering overview mode - set highlight to current slide
+        setOverviewHighlightIndex(currentSlideIndex);
+        // Scroll to current slide after entering overview
+        setTimeout(() => {
+          overviewSlideRefs.current[currentSlideIndex]?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest', 
+            inline: 'nearest' 
+          });
+        }, 100);
+        return AppMode.OVERVIEW;
+      } else {
+        return AppMode.PRESENTATION;
+      }
+    });
     setIsSpotlightActive(false); 
-  }, []);
+  }, [currentSlideIndex]);
 
   const selectSlide = (index: number) => {
     setCurrentSlideIndex(index);
@@ -228,9 +251,10 @@ const App: React.FC = () => {
     }
   }, [mode, isLaserActive]);
 
-  // Track mouse position for laser pointer (normalized relative to image bounds)
+  // Track mouse position for spotlight and laser pointer (shared calculation logic)
   useEffect(() => {
-    if (!isLaserActive || mode !== AppMode.PRESENTATION) {
+    if ((!isSpotlightActive && !isLaserActive) || mode !== AppMode.PRESENTATION) {
+      setSpotlightPosition(null);
       setLaserPosition(null);
       return;
     }
@@ -278,18 +302,35 @@ const App: React.FC = () => {
         
         // Only update if mouse is within CONTENT bounds
         if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
-          setLaserPosition({ x: relativeX, y: relativeY });
+          const normalizedPos = { x: relativeX, y: relativeY };
+          if (isSpotlightActive) {
+            setSpotlightPosition(normalizedPos);
+          }
+          if (isLaserActive) {
+            setLaserPosition(normalizedPos);
+          }
         } else {
-          setLaserPosition(null);
+          if (isSpotlightActive) {
+            setSpotlightPosition(null);
+          }
+          if (isLaserActive) {
+            setLaserPosition(null);
+          }
         }
       } else {
-        setLaserPosition(null);
+        // Hide if no image found or dimensions are zero
+        if (isSpotlightActive) {
+          setSpotlightPosition(null);
+        }
+        if (isLaserActive) {
+          setLaserPosition(null);
+        }
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [isLaserActive, mode]);
+  }, [isSpotlightActive, isLaserActive, mode, isDualScreen]);
 
   // Resize handlers (must be before any conditional returns)
   const handleResizeStart = useCallback((type: string) => {
@@ -338,11 +379,83 @@ const App: React.FC = () => {
 
       switch (e.key) {
         case 'ArrowRight':
+          if (mode === AppMode.OVERVIEW) {
+            e.preventDefault();
+            const newIndex = Math.min(overviewHighlightIndex + 1, slides.length - 1);
+            setOverviewHighlightIndex(newIndex);
+            // Scroll into view after state update
+            setTimeout(() => {
+              overviewSlideRefs.current[newIndex]?.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest', 
+                inline: 'nearest' 
+              });
+            }, 0);
+          } else if (mode === AppMode.PRESENTATION) {
+            nextSlide();
+          }
+          break;
+        case 'ArrowLeft':
+          if (mode === AppMode.OVERVIEW) {
+            e.preventDefault();
+            const newIndex = Math.max(overviewHighlightIndex - 1, 0);
+            setOverviewHighlightIndex(newIndex);
+            // Scroll into view after state update
+            setTimeout(() => {
+              overviewSlideRefs.current[newIndex]?.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest', 
+                inline: 'nearest' 
+              });
+            }, 0);
+          } else if (mode === AppMode.PRESENTATION) {
+            prevSlide();
+          }
+          break;
+        case 'ArrowDown':
+          if (mode === AppMode.OVERVIEW) {
+            e.preventDefault();
+            // Move down in grid (4 columns)
+            const cols = 4;
+            const newIndex = Math.min(overviewHighlightIndex + cols, slides.length - 1);
+            setOverviewHighlightIndex(newIndex);
+            // Scroll into view after state update
+            setTimeout(() => {
+              overviewSlideRefs.current[newIndex]?.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest', 
+                inline: 'nearest' 
+              });
+            }, 0);
+          }
+          break;
+        case 'ArrowUp':
+          if (mode === AppMode.OVERVIEW) {
+            e.preventDefault();
+            // Move up in grid (4 columns)
+            const cols = 4;
+            const newIndex = Math.max(overviewHighlightIndex - cols, 0);
+            setOverviewHighlightIndex(newIndex);
+            // Scroll into view after state update
+            setTimeout(() => {
+              overviewSlideRefs.current[newIndex]?.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest', 
+                inline: 'nearest' 
+              });
+            }, 0);
+          }
+          break;
+        case 'Enter':
+          if (mode === AppMode.OVERVIEW) {
+            e.preventDefault();
+            selectSlide(overviewHighlightIndex);
+          }
+          break;
         case ' ':
         case 'PageDown':
           if (mode === AppMode.PRESENTATION) nextSlide();
           break;
-        case 'ArrowLeft':
         case 'PageUp':
         case 'Backspace':
           if (mode === AppMode.PRESENTATION) prevSlide();
@@ -415,6 +528,7 @@ const App: React.FC = () => {
                   type: 'STATE_UPDATE',
                   index: currentSlideIndex,
                   isSpotlight: isSpotlightActive,
+                  spotlightPosition: spotlightPosition,
                   mode: mode,
                   isLaserActive: isLaserActive,
                   laserPosition: laserPosition,
@@ -439,6 +553,7 @@ const App: React.FC = () => {
                   type: 'STATE_UPDATE',
                   index: currentSlideIndex,
                   isSpotlight: isSpotlightActive,
+                  spotlightPosition: spotlightPosition,
                   mode: mode,
                   isLaserActive: isLaserActive,
                   laserPosition: laserPosition,
@@ -463,6 +578,7 @@ const App: React.FC = () => {
                   type: 'STATE_UPDATE',
                   index: currentSlideIndex,
                   isSpotlight: isSpotlightActive,
+                  spotlightPosition: spotlightPosition,
                   mode: mode,
                   isLaserActive: isLaserActive,
                   laserPosition: laserPosition,
@@ -487,6 +603,7 @@ const App: React.FC = () => {
                   type: 'STATE_UPDATE',
                   index: currentSlideIndex,
                   isSpotlight: isSpotlightActive,
+                  spotlightPosition: spotlightPosition,
                   mode: mode,
                   isLaserActive: isLaserActive,
                   laserPosition: laserPosition,
@@ -515,7 +632,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide]);
 
   // Mouse wheel zoom (Mode B) - Shift + Wheel
   useEffect(() => {
@@ -568,6 +685,7 @@ const App: React.FC = () => {
             type: 'STATE_UPDATE',
             index: currentSlideIndex,
             isSpotlight: isSpotlightActive,
+            spotlightPosition: spotlightPosition,
             mode: mode,
             isLaserActive: isLaserActive,
             laserPosition: laserPosition,
@@ -725,6 +843,7 @@ const App: React.FC = () => {
             type: 'STATE_UPDATE',
             index: currentSlideIndex,
             isSpotlight: isSpotlightActive,
+            spotlightPosition: spotlightPosition,
             mode: mode,
             isLaserActive: isLaserActive,
             laserPosition: laserPosition,
@@ -816,7 +935,14 @@ const App: React.FC = () => {
                  current={regionCurrent}
                  containerRef={presenterSlideRef}
                />
-               <SpotlightLayer isActive={isSpotlightActive} />
+               <SpotlightLayer 
+                 isActive={isSpotlightActive} 
+                 position={spotlightPosition}
+                 containerRef={presenterSlideRef}
+                 zoomLevel={zoomState.level}
+                 panX={zoomState.panX}
+                 panY={zoomState.panY}
+               />
                <LaserPointer 
                  isActive={isLaserActive} 
                  position={laserPosition} 
@@ -962,7 +1088,14 @@ const App: React.FC = () => {
             current={regionCurrent}
             containerRef={normalViewRef}
           />
-          <SpotlightLayer isActive={isSpotlightActive} />
+          <SpotlightLayer 
+            isActive={isSpotlightActive} 
+            position={spotlightPosition}
+            containerRef={normalViewRef}
+            zoomLevel={zoomState.level}
+            panX={zoomState.panX}
+            panY={zoomState.panY}
+          />
           <LaserPointer 
             isActive={isLaserActive} 
             position={laserPosition} 
@@ -1003,6 +1136,9 @@ const App: React.FC = () => {
             {slides.map((slide, index) => (
               <motion.div
                 key={index}
+                ref={(el) => {
+                  overviewSlideRefs.current[index] = el;
+                }}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
@@ -1011,6 +1147,8 @@ const App: React.FC = () => {
                   "cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
                   index === currentSlideIndex
                     ? "border-blue-500 ring-2 ring-blue-500/50"
+                    : index === overviewHighlightIndex
+                    ? "border-yellow-500 ring-2 ring-yellow-500/50 bg-yellow-500/10"
                     : "border-neutral-700 hover:border-neutral-600"
                 )}
               >

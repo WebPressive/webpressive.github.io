@@ -42,4 +42,4 @@ export interface ZoomState {
 export type SyncMessage = 
   | { type: 'SYNC_REQUEST' }
   | { type: 'SYNC_INIT'; slides: SlideData[]; startTime: number | null }
-  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState };
+  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; spotlightPosition?: { x: number; y: number } | null; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState };
