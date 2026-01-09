@@ -75,7 +75,7 @@ The production build uses Nginx to serve the optimized static files.
 - **TAB**: Toggle overview mode (grid view of all slides)
 - **S**: Toggle spotlight mode
 - **L**: Toggle laser pointer
-- **D**: Open dual-screen mode (receiver window)
+- **D**: Toggle dual-screen mode (receiver window)
 - **F**: Toggle fullscreen
 - **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
 

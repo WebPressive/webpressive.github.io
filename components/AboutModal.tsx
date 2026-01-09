@@ -110,7 +110,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         </div>
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">D</kbd>
-                          <span>Open dual-screen mode</span>
+                          <span>Toggle dual-screen mode</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">F</kbd>
@@ -189,7 +189,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                   <ol className="list-decimal list-inside space-y-2 text-neutral-300 text-sm">
                     <li>Upload a Beamer PDF or click "Start Demo" to load a sample presentation</li>
                     <li>Use arrow keys or space to navigate between slides</li>
-                    <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">D</kbd> to open dual-screen mode for projector displays</li>
+                    <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">D</kbd> to toggle dual-screen mode for projector displays</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">Z</kbd> then click and drag to zoom into a specific region</li>
                     <li>When zoomed, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">H</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">J</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">K</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">U</kbd> to pan, or right-click and drag</li>
                     <li>Use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">S</kbd> for spotlight or <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">L</kbd> for laser pointer</li>
