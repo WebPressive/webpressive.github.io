@@ -17,6 +17,15 @@ export interface PDFPageData {
 // Store for notes loaded from PDF metadata
 let metadataNotes: Record<string, string> = {};
 
+// Cache for PDF documents to enable re-rendering at different zoom levels
+interface PDFCache {
+  pdf: any; // PDF.js document
+  file: File;
+  arrayBuffer: ArrayBuffer;
+}
+
+let pdfCache: PDFCache | null = null;
+
 /**
  * Extracts link annotations from a PDF page
  * @param page - The PDF page object
@@ -294,13 +303,22 @@ function calculateOptimalScale(): number {
  */
 export async function extractPagesFromPDF(
   file: File,
-  scale?: number
+  scale?: number,
+  onProgress?: (current: number, total: number) => void
 ): Promise<PDFPageData[]> {
   // Reset metadata notes for new PDF
   metadataNotes = {};
   
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  
+  // Cache PDF for zoom re-rendering
+  pdfCache = {
+    pdf,
+    file,
+    arrayBuffer,
+  };
+  
   const pages: PDFPageData[] = [];
   
   // Check document-level metadata for speaker notes
@@ -428,6 +446,11 @@ export async function extractPagesFromPDF(
       notes,
       links,
     });
+
+    // Report progress after each page is processed
+    if (onProgress) {
+      onProgress(pageNum, pdf.numPages);
+    }
   }
 
   return pages;
@@ -441,9 +464,10 @@ export async function extractPagesFromPDF(
  */
 export async function pdfToSlides(
   file: File,
-  pdfName: string
+  pdfName: string,
+  onProgress?: (current: number, total: number) => void
 ): Promise<SlideData[]> {
-  const pages = await extractPagesFromPDF(file);
+  const pages = await extractPagesFromPDF(file, undefined, onProgress);
   
   return pages.map((page) => ({
     id: crypto.randomUUID(),
@@ -459,5 +483,65 @@ export async function pdfToSlides(
     // Store embedded links
     links: page.links,
   }));
+}
+
+/**
+ * Re-renders a specific PDF page at a given zoom level
+ * @param pageNumber - The page number to render (1-indexed)
+ * @param zoomLevel - Zoom level (1.0 = 100%, 2.0 = 200%, etc.)
+ * @returns Promise resolving to a blob URL for the zoomed image
+ */
+export async function renderPageAtZoom(
+  pageNumber: number,
+  zoomLevel: number
+): Promise<string> {
+  if (!pdfCache) {
+    throw new Error('PDF cache not available. Load a PDF first.');
+  }
+
+  const { pdf } = pdfCache;
+  const page = await pdf.getPage(pageNumber);
+  
+  // Calculate scale: base scale * zoom level * device pixel ratio
+  const baseScale = calculateOptimalScale();
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  const finalScale = baseScale * zoomLevel * devicePixelRatio;
+  
+  const viewport = page.getViewport({ scale: finalScale });
+
+  // Create a canvas to render the page
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d', {
+    alpha: false,
+    desynchronized: true,
+    willReadFrequently: false,
+  });
+  
+  if (!context) {
+    throw new Error('Could not get canvas context');
+  }
+
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  // Render the page
+  await page.render({
+    canvasContext: context,
+    viewport: viewport,
+    intent: 'display',
+  }).promise;
+
+  // Convert to blob URL
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Failed to convert canvas to blob'));
+      }
+    }, 'image/png', 1.0);
+  });
+
+  return URL.createObjectURL(blob);
 }
 

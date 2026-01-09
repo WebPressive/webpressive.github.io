@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Play, FileText, Loader2 } from 'lucide-react';
+import { Upload, Play, FileText, Loader2, Info } from 'lucide-react';
 import { SlideData } from '../types';
 import { pdfToSlides } from '../utils/pdfUtils';
+import AboutModal from './AboutModal';
 
 interface UploadScreenProps {
   onSlidesLoaded: (slides: SlideData[]) => void;
@@ -10,7 +11,24 @@ interface UploadScreenProps {
 const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [showAbout, setShowAbout] = useState(false);
   const clustrmapsRef = React.useRef<HTMLDivElement>(null);
+
+  // Keyboard shortcut for About (A key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A') {
+        setShowAbout(true);
+      }
+      if (e.key === 'Escape' && showAbout) {
+        setShowAbout(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAbout]);
 
   // Load ClustrMaps script
   useEffect(() => {
@@ -78,9 +96,17 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
 
       setIsProcessing(true);
       setProcessingStatus('Processing PDF...');
+      setProgress({ current: 0, total: 0 });
 
       try {
-        const slides = await pdfToSlides(file, file.name.replace(/\.pdf$/i, ''));
+        const slides = await pdfToSlides(
+          file, 
+          file.name.replace(/\.pdf$/i, ''),
+          (current, total) => {
+            setProgress({ current, total });
+            setProcessingStatus(`Processing page ${current} of ${total}...`);
+          }
+        );
         if (slides.length === 0) {
           throw new Error('PDF appears to be empty or could not be processed');
         }
@@ -93,6 +119,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
       } finally {
         setIsProcessing(false);
         setProcessingStatus('');
+        setProgress({ current: 0, total: 0 });
         // Reset file input to allow re-uploading the same file
         e.target.value = '';
       }
@@ -102,6 +129,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
   const loadDemo = async () => {
     setIsProcessing(true);
     setProcessingStatus('Loading demo PDF...');
+    setProgress({ current: 0, total: 0 });
 
     try {
       // Fetch the demo PDF file
@@ -114,7 +142,14 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
       const file = new File([blob], 'demo.pdf', { type: 'application/pdf' });
       
       setProcessingStatus('Processing demo PDF...');
-      const slides = await pdfToSlides(file, 'Demo Presentation');
+      const slides = await pdfToSlides(
+        file, 
+        'Demo Presentation',
+        (current, total) => {
+          setProgress({ current, total });
+          setProcessingStatus(`Processing page ${current} of ${total}...`);
+        }
+      );
       
       if (slides.length === 0) {
         throw new Error('Demo PDF appears to be empty or could not be processed');
@@ -129,6 +164,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
+      setProgress({ current: 0, total: 0 });
     }
   };
 
@@ -164,7 +200,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <h3 className="text-lg font-semibold mb-2">
               {isProcessing ? 'Processing PDF...' : 'Upload Beamer PDF'}
             </h3>
-            <p className="text-sm text-neutral-500 text-center">
+            <p className="text-sm text-neutral-500 text-center mb-3">
               {isProcessing ? (
                 processingStatus
               ) : (
@@ -173,6 +209,19 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
                 </>
               )}
             </p>
+            {isProcessing && progress.total > 0 && (
+              <div className="w-full max-w-xs mx-auto">
+                <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-full transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-neutral-400 mt-2 text-center">
+                  {Math.round((progress.current / progress.total) * 100)}%
+                </p>
+              </div>
+            )}
           </label>
 
           {/* Demo Card */}
@@ -191,7 +240,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <h3 className="text-lg font-semibold mb-2">
               {isProcessing ? 'Loading Demo...' : 'Start Demo'}
             </h3>
-            <p className="text-sm text-neutral-500 text-center">
+            <p className="text-sm text-neutral-500 text-center mb-3">
               {isProcessing ? (
                 processingStatus
               ) : (
@@ -200,6 +249,19 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
                 </>
               )}
             </p>
+            {isProcessing && progress.total > 0 && (
+              <div className="w-full max-w-xs mx-auto">
+                <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-purple-500 h-full transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-neutral-400 mt-2 text-center">
+                  {Math.round((progress.current / progress.total) * 100)}%
+                </p>
+              </div>
+            )}
           </button>
         </div>
 
@@ -224,6 +286,15 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">F</span>
             <span>Fullscreen</span>
           </div>
+          <button
+            onClick={() => setShowAbout(true)}
+            className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
+            title="About (A)"
+          >
+            <Info className="w-4 h-4" />
+            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">A</span>
+            <span>About</span>
+          </button>
         </div>
       </div>
 
@@ -268,6 +339,9 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
           </div>
         </div>
       </div>
+
+      {/* About Modal */}
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </div>
   );
 };

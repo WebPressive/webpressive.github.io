@@ -6,6 +6,23 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 🌐 **Live Demo**: [View on GitHub Pages](https://webpressive.github.io)
 
+## Features
+
+- **Dual-Screen Mode**: Open a synchronized receiver window for projector displays
+- **PDF Import**: Load Beamer PDF presentations with real-time progress tracking
+- **Speaker Notes**: Automatically extracts and displays speaker notes from Beamer PDFs
+- **Embedded Links**: Clickable links from PDFs are preserved and functional
+- **Zoom & Pan**: Multiple zoom modes with smooth panning
+  - Fixed zoom levels (50%, 100%, 150%, 200%)
+  - Continuous zoom with mouse wheel
+  - Region selection zoom
+  - Pan with right-click drag when zoomed
+- **Spotlight**: Dim the screen except for a highlighted area
+- **Laser Pointer**: Synchronized laser pointer across presenter and receiver screens
+- **Overview Mode**: Grid view of all slides for quick navigation
+- **Resizable Panels**: Customize presenter view layout (main slide, next slide preview, notes)
+- **Fullscreen Support**: Present in fullscreen mode
+
 ## Run Locally
 
 ### Option 1: Using Docker (Recommended for Development)
@@ -46,3 +63,70 @@ docker run -p 80:80 webpressive:prod
 ```
 
 The production build uses Nginx to serve the optimized static files.
+
+## Keyboard Shortcuts
+
+### Navigation
+- **Arrow Left** / **Arrow Right**: Previous / Next slide
+- **Space** / **Page Down**: Next slide
+- **Page Up** / **Backspace**: Previous slide
+
+### Presentation Modes
+- **TAB**: Toggle overview mode (grid view of all slides)
+- **S**: Toggle spotlight mode
+- **L**: Toggle laser pointer
+- **D**: Open dual-screen mode (receiver window)
+- **F**: Toggle fullscreen
+- **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
+
+### Zoom Controls
+- **1**: Zoom to 50%
+- **2**: Zoom to 100% (normal size)
+- **3**: Zoom to 150%
+- **4**: Zoom to 200%
+- **R**: Reset zoom to 100%
+- **Z**: Enter region zoom mode (then click and drag to select area)
+- **Shift + Mouse Wheel**: Continuous zoom in/out
+- **Right-Click + Drag**: Pan when zoomed in
+- **H**: Pan left (when zoomed)
+- **J**: Pan down (when zoomed)
+- **K**: Pan right (when zoomed)
+- **U**: Pan up (when zoomed)
+
+### Mouse Interactions
+- **Left Click**: Navigate links (when not in region zoom mode)
+- **Right-Click + Drag**: Pan the slide when zoomed
+- **Z + Left Click + Drag**: Select region to zoom into
+
+## Features in Detail
+
+### Dual-Screen Mode
+Open a synchronized receiver window that displays the current slide on a second screen or projector. The receiver window automatically syncs:
+- Current slide
+- Zoom level and pan position
+- Spotlight state
+- Laser pointer position
+- Overview mode
+
+### Speaker Notes
+WebPressive automatically extracts speaker notes from Beamer PDFs. Notes are displayed in the presenter view sidebar and can be scrolled if they are long.
+
+### Zoom Functionality
+Three zoom modes are available:
+1. **Fixed Levels**: Press `1`, `2`, `3`, or `4` for preset zoom levels
+2. **Continuous**: Hold `Shift` and scroll the mouse wheel for smooth zooming
+3. **Region Selection**: Press `Z`, then click and drag to select a region. Release to zoom into that area
+
+When zoomed in, use right-click and drag to pan around the slide, or use keyboard shortcuts: `H` (left), `J` (down), `K` (right), `U` (up). Press `R` to reset zoom.
+
+### Embedded Links
+Links embedded in the PDF (both internal navigation and external URLs) are preserved and clickable. Internal links navigate to the target slide, while external links open in a new tab.
+
+### Progress Indicator
+When loading a PDF, a progress bar shows the current processing status with page-by-page feedback.
+
+## License
+
+Copyright (c) 2026 Sinan Bank
+
+This software is provided for educational use only. See [LICENSE](LICENSE) for details.

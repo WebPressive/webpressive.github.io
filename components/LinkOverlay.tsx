@@ -6,6 +6,9 @@ interface LinkOverlayProps {
   containerRef: React.RefObject<HTMLDivElement>;
   onNavigate?: (pageIndex: number) => void;
   disabled?: boolean; // Disable links during active presentation
+  zoomLevel?: number; // Current zoom level
+  panX?: number; // Pan offset X
+  panY?: number; // Pan offset Y
 }
 
 interface PositionedLink extends PDFLink {
@@ -20,6 +23,9 @@ const LinkOverlay: React.FC<LinkOverlayProps> = ({
   containerRef,
   onNavigate,
   disabled = false,
+  zoomLevel = 1.0,
+  panX = 0,
+  panY = 0,
 }) => {
   const [positionedLinks, setPositionedLinks] = useState<PositionedLink[]>([]);
   const [hoveredLink, setHoveredLink] = useState<number | null>(null);
@@ -43,13 +49,13 @@ const LinkOverlay: React.FC<LinkOverlayProps> = ({
       return;
     }
 
-    const imgRect = img.getBoundingClientRect();
+    // Use container dimensions as the base (unzoomed) frame
     const containerRect = containerRef.current.getBoundingClientRect();
 
-    // Calculate the actual rendered dimensions of the image within the img element
+    // Calculate the actual rendered dimensions of the image within the container (unzoomed)
     // because object-fit: contain might leave empty space (letterboxing)
     const naturalRatio = img.naturalWidth / img.naturalHeight;
-    const visibleRatio = imgRect.width / imgRect.height;
+    const visibleRatio = containerRect.width / containerRect.height;
 
     let renderedWidth: number;
     let renderedHeight: number;
@@ -58,34 +64,36 @@ const LinkOverlay: React.FC<LinkOverlayProps> = ({
 
     if (visibleRatio > naturalRatio) {
       // Container is wider than image -> Image is height-constrained
-      renderedHeight = imgRect.height;
-      renderedWidth = imgRect.height * naturalRatio;
+      renderedHeight = containerRect.height;
+      renderedWidth = containerRect.height * naturalRatio;
       contentTop = 0;
-      contentLeft = (imgRect.width - renderedWidth) / 2;
+      contentLeft = (containerRect.width - renderedWidth) / 2;
     } else {
       // Container is taller than image -> Image is width-constrained
-      renderedWidth = imgRect.width;
-      renderedHeight = imgRect.width / naturalRatio;
+      renderedWidth = containerRect.width;
+      renderedHeight = containerRect.width / naturalRatio;
       contentLeft = 0;
-      contentTop = (imgRect.height - renderedHeight) / 2;
+      contentTop = (containerRect.height - renderedHeight) / 2;
     }
 
-    // Calculate total offset relative to the container
-    // imgRect coordinates are relative to viewport
-    // containerRect coordinates are relative to viewport
-    const finalOffsetX = (imgRect.left - containerRect.left) + contentLeft;
-    const finalOffsetY = (imgRect.top - containerRect.top) + contentTop;
+    // Offset is just the content offset within the container
+    const finalOffsetX = contentLeft;
+    const finalOffsetY = contentTop;
 
-    const positioned = links.map((link) => ({
-      ...link,
-      pixelX: finalOffsetX + link.x * renderedWidth,
-      pixelY: finalOffsetY + link.y * renderedHeight,
-      pixelWidth: link.width * renderedWidth,
-      pixelHeight: link.height * renderedHeight,
-    }));
+    // Calculate base positions (unzoomed)
+    // We will apply the zoom transform to the entire overlay container via CSS
+    const positioned = links.map((link) => {
+      return {
+        ...link,
+        pixelX: finalOffsetX + link.x * renderedWidth,
+        pixelY: finalOffsetY + link.y * renderedHeight,
+        pixelWidth: link.width * renderedWidth,
+        pixelHeight: link.height * renderedHeight,
+      };
+    });
 
     setPositionedLinks(positioned);
-  }, [links, containerRef]);
+  }, [links, containerRef]); // Removed zoomLevel/panX/panY dependencies as we handle them via CSS
 
   // Recalculate on resize and when links change
   useEffect(() => {
@@ -145,8 +153,14 @@ const LinkOverlay: React.FC<LinkOverlayProps> = ({
 
   return (
     <div 
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 10 }}
+      className="absolute inset-0 pointer-events-none transition-transform duration-200"
+      style={{ 
+        zIndex: 10,
+        transform: zoomLevel > 1.0 
+          ? `scale(${zoomLevel}) translate(${panX / zoomLevel}px, ${panY / zoomLevel}px)`
+          : 'none',
+        transformOrigin: 'center center',
+      }}
     >
       {positionedLinks.map((link, index) => (
         <div

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SlideData, SyncMessage, AppMode } from '../types';
+import { SlideData, SyncMessage, AppMode, ZoomState } from '../types';
 import SpotlightLayer from './SpotlightLayer';
 import LaserPointer from './LaserPointer';
 import LinkOverlay from './LinkOverlay';
@@ -13,6 +13,7 @@ const ReceiverView: React.FC = () => {
   const [isLaser, setIsLaser] = useState(false);
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [mode, setMode] = useState<AppMode>(AppMode.PRESENTATION);
+  const [zoomState, setZoomState] = useState<ZoomState>({ level: 1.0, panX: 0, panY: 0 });
   const receiverContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +55,9 @@ const ReceiverView: React.FC = () => {
         if (msg.laserPosition !== undefined) {
           setLaserPosition(msg.laserPosition);
         }
+        if (msg.zoomState) {
+          setZoomState(msg.zoomState);
+        }
       }
     };
 
@@ -84,24 +88,28 @@ const ReceiverView: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-             <AnimatePresence mode="wait">
-              <motion.img
+             {/* Using standard img instead of motion.img because framer-motion's 
+                 animate={{ x: 0 }} overrides the style.transform used for zoom */}
+              <img
                 key={`slide-${slides[currentIndex].id}`}
                 src={slides[currentIndex].src}
                 alt={slides[currentIndex].name}
-                className="w-full h-full object-contain"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                layoutId={`slide-${slides[currentIndex].id}`}
+                className="w-full h-full object-contain transition-transform duration-200"
+                style={{
+                  transform: zoomState.level > 1.0
+                    ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
+                    : 'none',
+                  transformOrigin: 'center center',
+                }}
               />
-            </AnimatePresence>
             {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
             <LinkOverlay 
               links={slides[currentIndex].links || []} 
               containerRef={receiverContainerRef}
               disabled={true}
+              zoomLevel={zoomState.level}
+              panX={zoomState.panX}
+              panY={zoomState.panY}
             />
           </motion.div>
         )}
@@ -125,7 +133,14 @@ const ReceiverView: React.FC = () => {
       </AnimatePresence>
 
       <SpotlightLayer isActive={isSpotlight} />
-      <LaserPointer isActive={isLaser} position={laserPosition} containerRef={receiverContainerRef} />
+      <LaserPointer 
+        isActive={isLaser} 
+        position={laserPosition} 
+        containerRef={receiverContainerRef} 
+        zoomLevel={zoomState.level}
+        panX={zoomState.panX}
+        panY={zoomState.panY}
+      />
     </div>
   );
 };

@@ -33,7 +33,13 @@ export interface PresentationState {
   startTime: number | null;
 }
 
+export interface ZoomState {
+  level: number; // Zoom level (1.0 = 100%, 2.0 = 200%, etc.)
+  panX: number; // Pan offset X (in pixels)
+  panY: number; // Pan offset Y (in pixels)
+}
+
 export type SyncMessage = 
   | { type: 'SYNC_REQUEST' }
   | { type: 'SYNC_INIT'; slides: SlideData[]; startTime: number | null }
-  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null };
+  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState };

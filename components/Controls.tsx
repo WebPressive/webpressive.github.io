@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2 } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -10,12 +10,14 @@ interface ControlsProps {
   isSpotlight: boolean;
   isLaser?: boolean;
   startTime: number | null;
+  zoomLevel?: number;
   toggleOverview: () => void;
   toggleSpotlight: () => void;
   toggleLaser?: () => void;
   toggleDualScreen?: () => void;
   nextSlide: () => void;
   prevSlide: () => void;
+  onAboutClick?: () => void;
   isReceiver?: boolean; // If true, hide interactive controls except fullscreen
 }
 
@@ -26,12 +28,14 @@ const Controls: React.FC<ControlsProps> = ({
   isSpotlight,
   isLaser = false,
   startTime,
+  zoomLevel = 1.0,
   toggleOverview,
   toggleSpotlight,
   toggleLaser,
   toggleDualScreen,
   nextSlide,
   prevSlide,
+  onAboutClick,
   isReceiver = false
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -152,7 +156,26 @@ const Controls: React.FC<ControlsProps> = ({
           {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
         </button>
 
+        {onAboutClick && (
+          <button 
+            onClick={onAboutClick} 
+            className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+            title="About (A)"
+          >
+            <Info className="w-5 h-5" />
+          </button>
+        )}
+
         <div className="w-px h-6 bg-white/10 mx-2" />
+
+        {zoomLevel !== 1.0 && (
+          <>
+            <div className="text-sm font-mono text-neutral-400 px-2">
+              {Math.round(zoomLevel * 100)}%
+            </div>
+            <div className="w-px h-6 bg-white/10 mx-2" />
+          </>
+        )}
 
         <div className="flex items-center space-x-2 px-2">
             <Clock className="w-4 h-4 text-neutral-500" />

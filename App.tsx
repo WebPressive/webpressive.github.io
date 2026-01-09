@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SlideData, AppMode, SyncMessage } from './types';
+import { Search } from 'lucide-react';
+import { SlideData, AppMode, SyncMessage, ZoomState } from './types';
 import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
 import SpotlightLayer from './components/SpotlightLayer';
 import LaserPointer from './components/LaserPointer';
 import LinkOverlay from './components/LinkOverlay';
+import RegionSelector from './components/RegionSelector';
 import ReceiverView from './components/ReceiverView';
+import AboutModal from './components/AboutModal';
+import { renderPageAtZoom } from './utils/pdfUtils';
 import { clsx } from 'clsx';
 
 const App: React.FC = () => {
@@ -25,6 +29,7 @@ const App: React.FC = () => {
   const [isSpotlightActive, setIsSpotlightActive] = useState(false);
   const [isLaserActive, setIsLaserActive] = useState(false);
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   
   // Dual Screen State
@@ -39,6 +44,20 @@ const App: React.FC = () => {
   // Refs for laser pointer containers
   const presenterSlideRef = useRef<HTMLDivElement>(null);
   const normalViewRef = useRef<HTMLDivElement>(null);
+  
+  // Zoom state
+  const [zoomState, setZoomState] = useState<ZoomState>({ level: 1.0, panX: 0, panY: 0 });
+  const [isZooming, setIsZooming] = useState(false);
+  const [isRegionSelecting, setIsRegionSelecting] = useState(false);
+  const [regionStart, setRegionStart] = useState<{ x: number; y: number } | null>(null);
+  const [regionCurrent, setRegionCurrent] = useState<{ x: number; y: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const isDraggingRef = useRef(false);
+  const regionStartRef = useRef<{ x: number; y: number } | null>(null);
+  const regionCurrentRef = useRef<{ x: number; y: number } | null>(null);
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+  const [zoomedSlideSrc, setZoomedSlideSrc] = useState<string | null>(null);
+  const zoomedSlideRef = useRef<string | null>(null); // Track which slide is currently zoomed
 
   // --- Dual Screen / Broadcasting Logic ---
   useEffect(() => {
@@ -56,20 +75,21 @@ const App: React.FC = () => {
           slides: slides,
           startTime: startTime
         });
-        // Send current state
+        // Send current state immediately (including zoom)
         channel.postMessage({
           type: 'STATE_UPDATE',
           index: currentSlideIndex,
           isSpotlight: isSpotlightActive,
           mode: mode,
           isLaserActive: isLaserActive,
-          laserPosition: laserPosition
-        });
+          laserPosition: laserPosition,
+          zoomState: zoomState
+        } as SyncMessage);
       }
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition, zoomState]);
 
   // Broadcast state changes
   useEffect(() => {
@@ -80,10 +100,11 @@ const App: React.FC = () => {
         isSpotlight: isSpotlightActive,
         mode: mode,
         isLaserActive: isLaserActive,
-        laserPosition: laserPosition
+        laserPosition: laserPosition,
+        zoomState: zoomState
       });
     }
-  }, [currentSlideIndex, isSpotlightActive, mode, isReceiver, isLaserActive, laserPosition]);
+  }, [currentSlideIndex, isSpotlightActive, mode, isReceiver, isLaserActive, laserPosition, zoomState]);
 
   const openDualScreen = () => {
     window.open(`${window.location.pathname}?mode=receiver`, 'WebPressiveReceiver', 'width=800,height=600');
@@ -98,13 +119,83 @@ const App: React.FC = () => {
     setCurrentSlideIndex(0);
   };
 
+  // Zoom functions
+  const applyZoom = useCallback(async (zoomLevel: number, resetPan: boolean = false) => {
+    if (slides.length === 0) return;
+    
+    setIsZooming(true);
+    try {
+      const pageNumber = currentSlideIndex + 1; // PDF pages are 1-indexed
+      const newBlobUrl = await renderPageAtZoom(pageNumber, zoomLevel);
+      
+      // Clean up old zoomed image if it exists
+      if (zoomedSlideSrc && zoomedSlideSrc !== slides[currentSlideIndex].src) {
+        URL.revokeObjectURL(zoomedSlideSrc);
+      }
+      
+      setZoomedSlideSrc(newBlobUrl);
+      zoomedSlideRef.current = slides[currentSlideIndex].id;
+      
+      setZoomState((prev) => {
+        const newZoomState = {
+          level: zoomLevel,
+          panX: resetPan ? 0 : prev.panX,
+          panY: resetPan ? 0 : prev.panY,
+        };
+
+        // Broadcast zoom state for dual screen
+        if (broadcastChannelRef.current) {
+          broadcastChannelRef.current.postMessage({
+            type: 'STATE_UPDATE',
+            index: currentSlideIndex,
+            isSpotlight: isSpotlightActive,
+            mode: mode,
+            isLaserActive: isLaserActive,
+            laserPosition: laserPosition,
+            zoomState: newZoomState,
+          } as SyncMessage);
+        }
+
+        return newZoomState;
+      });
+    } catch (error) {
+      console.error('Failed to apply zoom:', error);
+    } finally {
+      setIsZooming(false);
+    }
+  }, [slides, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition, zoomState]);
+
+  const resetZoom = useCallback(() => {
+    if (zoomedSlideSrc && zoomedSlideSrc !== slides[currentSlideIndex]?.src) {
+      URL.revokeObjectURL(zoomedSlideSrc);
+    }
+    setZoomedSlideSrc(null);
+    zoomedSlideRef.current = null;
+    setZoomState({ level: 1.0, panX: 0, panY: 0 });
+    
+    // Broadcast reset
+    if (broadcastChannelRef.current) {
+      broadcastChannelRef.current.postMessage({
+        type: 'STATE_UPDATE',
+        index: currentSlideIndex,
+        isSpotlight: isSpotlightActive,
+        mode: mode,
+        isLaserActive: isLaserActive,
+        laserPosition: laserPosition,
+        zoomState: { level: 1.0, panX: 0, panY: 0 },
+      } as SyncMessage);
+    }
+  }, [zoomedSlideSrc, slides, currentSlideIndex, isSpotlightActive, mode, isLaserActive, laserPosition]);
+
   const nextSlide = useCallback(() => {
     setCurrentSlideIndex((prev) => Math.min(prev + 1, slides.length - 1));
-  }, [slides.length]);
+    resetZoom(); // Reset zoom when changing slides
+  }, [slides.length, resetZoom]);
 
   const prevSlide = useCallback(() => {
     setCurrentSlideIndex((prev) => Math.max(prev - 1, 0));
-  }, []);
+    resetZoom(); // Reset zoom when changing slides
+  }, [resetZoom]);
 
   const toggleOverview = useCallback(() => {
     setMode((prev) => (prev === AppMode.PRESENTATION ? AppMode.OVERVIEW : AppMode.PRESENTATION));
@@ -114,6 +205,7 @@ const App: React.FC = () => {
   const selectSlide = (index: number) => {
     setCurrentSlideIndex(index);
     setMode(AppMode.PRESENTATION);
+    resetZoom(); // Reset zoom when changing slides
   };
 
   const toggleSpotlight = useCallback(() => {
@@ -145,31 +237,53 @@ const App: React.FC = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       // Find the image element to get its actual rendered bounds
-      const container = document.querySelector('.presenter-container') || document.body;
+      let container: HTMLElement | null = null;
+      if (isDualScreen && presenterSlideRef.current) {
+        container = presenterSlideRef.current;
+      } else if (!isDualScreen && normalViewRef.current) {
+        container = normalViewRef.current;
+      }
+      
+      if (!container) {
+        container = document.querySelector('.presenter-container') || document.body;
+      }
+
       const img = container.querySelector('img[class*="object-contain"]') as HTMLImageElement;
       
-      if (img) {
+      if (img && img.naturalWidth && img.naturalHeight) {
         const rect = img.getBoundingClientRect();
-        // Calculate position relative to the image bounds
-        const relativeX = (e.clientX - rect.left) / rect.width;
-        const relativeY = (e.clientY - rect.top) / rect.height;
         
-        // Only update if mouse is within image bounds
+        // Calculate rendered content dimensions (accounting for object-fit: contain)
+        const naturalRatio = img.naturalWidth / img.naturalHeight;
+        const visibleRatio = rect.width / rect.height;
+        
+        let renderedWidth = rect.width;
+        let renderedHeight = rect.height;
+        let contentLeft = 0;
+        let contentTop = 0;
+        
+        if (visibleRatio > naturalRatio) {
+          // Wider than content -> height constrained
+          renderedWidth = rect.height * naturalRatio;
+          contentLeft = (rect.width - renderedWidth) / 2;
+        } else {
+          // Taller than content -> width constrained
+          renderedHeight = rect.width / naturalRatio;
+          contentTop = (rect.height - renderedHeight) / 2;
+        }
+        
+        // Calculate position relative to the CONTENT
+        const relativeX = (e.clientX - rect.left - contentLeft) / renderedWidth;
+        const relativeY = (e.clientY - rect.top - contentTop) / renderedHeight;
+        
+        // Only update if mouse is within CONTENT bounds
         if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
           setLaserPosition({ x: relativeX, y: relativeY });
+        } else {
+          setLaserPosition(null);
         }
       } else {
-        // Fallback: try to find image in normal presentation view
-        const normalImg = document.querySelector('img[class*="object-contain"]') as HTMLImageElement;
-        if (normalImg) {
-          const rect = normalImg.getBoundingClientRect();
-          const relativeX = (e.clientX - rect.left) / rect.width;
-          const relativeY = (e.clientY - rect.top) / rect.height;
-          
-          if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
-            setLaserPosition({ x: relativeX, y: relativeY });
-          }
-        }
+        setLaserPosition(null);
       }
     };
 
@@ -259,17 +373,386 @@ const App: React.FC = () => {
             document.exitFullscreen();
           }
           break;
+        case '1':
+          if (mode === AppMode.PRESENTATION) applyZoom(0.5, true);
+          break;
+        case '2':
+          if (mode === AppMode.PRESENTATION) applyZoom(1.0, true);
+          break;
+        case '3':
+          if (mode === AppMode.PRESENTATION) applyZoom(1.5, true);
+          break;
+        case '4':
+          if (mode === AppMode.PRESENTATION) applyZoom(2.0, true);
+          break;
+        case 'r':
+        case 'R':
+          if (mode === AppMode.PRESENTATION) resetZoom();
+          break;
+        case 'z':
+        case 'Z':
+          if (mode === AppMode.PRESENTATION && !isRegionSelecting) {
+            setIsRegionSelecting(true);
+          }
+          break;
+        case 'a':
+        case 'A':
+          if (mode === AppMode.PRESENTATION || mode === AppMode.OVERVIEW) {
+            setShowAbout(true);
+          }
+          break;
+        case 'h':
+        case 'H':
+          // Pan right (only when zoomed)
+          if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
+            e.preventDefault();
+            const panStep = 50; // pixels per keypress
+            setZoomState((prev) => {
+              const newPanX = prev.panX + panStep;
+              // Broadcast pan update
+              if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({
+                  type: 'STATE_UPDATE',
+                  index: currentSlideIndex,
+                  isSpotlight: isSpotlightActive,
+                  mode: mode,
+                  isLaserActive: isLaserActive,
+                  laserPosition: laserPosition,
+                  zoomState: { ...prev, panX: newPanX },
+                } as SyncMessage);
+              }
+              return { ...prev, panX: newPanX };
+            });
+          }
+          break;
+        case 'j':
+        case 'J':
+          // Pan up (only when zoomed)
+          if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
+            e.preventDefault();
+            const panStep = 50; // pixels per keypress
+            setZoomState((prev) => {
+              const newPanY = prev.panY - panStep;
+              // Broadcast pan update
+              if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({
+                  type: 'STATE_UPDATE',
+                  index: currentSlideIndex,
+                  isSpotlight: isSpotlightActive,
+                  mode: mode,
+                  isLaserActive: isLaserActive,
+                  laserPosition: laserPosition,
+                  zoomState: { ...prev, panY: newPanY },
+                } as SyncMessage);
+              }
+              return { ...prev, panY: newPanY };
+            });
+          }
+          break;
+        case 'k':
+        case 'K':
+          // Pan left (only when zoomed)
+          if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
+            e.preventDefault();
+            const panStep = 50; // pixels per keypress
+            setZoomState((prev) => {
+              const newPanX = prev.panX - panStep;
+              // Broadcast pan update
+              if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({
+                  type: 'STATE_UPDATE',
+                  index: currentSlideIndex,
+                  isSpotlight: isSpotlightActive,
+                  mode: mode,
+                  isLaserActive: isLaserActive,
+                  laserPosition: laserPosition,
+                  zoomState: { ...prev, panX: newPanX },
+                } as SyncMessage);
+              }
+              return { ...prev, panX: newPanX };
+            });
+          }
+          break;
+        case 'u':
+        case 'U':
+          // Pan down (only when zoomed)
+          if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
+            e.preventDefault();
+            const panStep = 50; // pixels per keypress
+            setZoomState((prev) => {
+              const newPanY = prev.panY + panStep;
+              // Broadcast pan update
+              if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({
+                  type: 'STATE_UPDATE',
+                  index: currentSlideIndex,
+                  isSpotlight: isSpotlightActive,
+                  mode: mode,
+                  isLaserActive: isLaserActive,
+                  laserPosition: laserPosition,
+                  zoomState: { ...prev, panY: newPanY },
+                } as SyncMessage);
+              }
+              return { ...prev, panY: newPanY };
+            });
+          }
+          break;
         case 'Escape':
-          if (mode === AppMode.OVERVIEW) setMode(AppMode.PRESENTATION);
-          else if (isSpotlightActive) setIsSpotlightActive(false);
-          else if (isLaserActive) setIsLaserActive(false);
+          if (showAbout) {
+            setShowAbout(false);
+          } else if (mode === AppMode.OVERVIEW) {
+            setMode(AppMode.PRESENTATION);
+          } else if (isSpotlightActive) {
+            setIsSpotlightActive(false);
+          } else if (isLaserActive) {
+            setIsLaserActive(false);
+          } else if (isRegionSelecting) {
+            setIsRegionSelecting(false);
+          }
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition]);
+
+  // Mouse wheel zoom (Mode B) - Shift + Wheel
+  useEffect(() => {
+    if (mode !== AppMode.PRESENTATION || isRegionSelecting) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        const newZoom = Math.max(0.5, Math.min(3.0, zoomState.level + delta));
+        applyZoom(newZoom, false);
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [mode, zoomState.level, applyZoom, isRegionSelecting]);
+
+  // Right-click drag panning
+  useEffect(() => {
+    if (mode !== AppMode.PRESENTATION || zoomState.level <= 1.0) return;
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) { // Right mouse button
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isPanning && panStart) {
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
+        
+        setZoomState((prev) => ({
+          ...prev,
+          panX: prev.panX + deltaX,
+          panY: prev.panY + deltaY,
+        }));
+        
+        setPanStart({ x: e.clientX, y: e.clientY });
+        
+        // Broadcast pan update
+        if (broadcastChannelRef.current) {
+          broadcastChannelRef.current.postMessage({
+            type: 'STATE_UPDATE',
+            index: currentSlideIndex,
+            isSpotlight: isSpotlightActive,
+            mode: mode,
+            isLaserActive: isLaserActive,
+            laserPosition: laserPosition,
+            zoomState: {
+              level: zoomState.level,
+              panX: zoomState.panX + deltaX,
+              panY: zoomState.panY + deltaY,
+            },
+          } as SyncMessage);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsPanning(false);
+      setPanStart(null);
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [mode, zoomState, isPanning, panStart, currentSlideIndex, isSpotlightActive, isLaserActive, laserPosition]);
+
+  // Region selection with Z key (Mode C)
+  useEffect(() => {
+    if (!isRegionSelecting || mode !== AppMode.PRESENTATION) {
+      setRegionStart(null);
+      setRegionCurrent(null);
+      isDraggingRef.current = false;
+      return;
+    }
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 0 && !isDraggingRef.current) { // Left mouse button
+        e.preventDefault();
+        e.stopPropagation();
+        isDraggingRef.current = true;
+        
+        const container = (isDualScreen ? presenterSlideRef.current : normalViewRef.current) || document.body;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        
+        const point = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+        
+        regionStartRef.current = point;
+        regionCurrentRef.current = point;
+        setRegionStart(point);
+        setRegionCurrent(point);
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !regionStartRef.current) return;
+      
+      const container = (isDualScreen ? presenterSlideRef.current : normalViewRef.current) || document.body;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      
+      const point = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      
+      regionCurrentRef.current = point;
+      setRegionCurrent(point);
+    };
+
+    const handleMouseUp = async (e: MouseEvent) => {
+      if (!isDraggingRef.current || !regionStartRef.current || !regionCurrentRef.current) {
+        isDraggingRef.current = false;
+        return;
+      }
+      
+      e.preventDefault();
+      e.stopPropagation();
+      isDraggingRef.current = false;
+      
+      const container = (isDualScreen ? presenterSlideRef.current : normalViewRef.current) || document.body;
+      if (!container) return;
+      
+      const img = container.querySelector('img[class*="object-contain"]') as HTMLImageElement;
+      if (!img) {
+        setIsRegionSelecting(false);
+        setRegionStart(null);
+        setRegionCurrent(null);
+        return;
+      }
+
+      // We need BOTH container rect (unzoomed base) AND img rect (zoomed visual)
+      const containerRect = container.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      
+      // 1. Calculate region relative to the current visual image (normalized 0-1)
+      const currentVisualLeft = imgRect.left - containerRect.left;
+      const currentVisualTop = imgRect.top - containerRect.top;
+      
+      // Calculate start/end in 0-1 coords relative to the visual image
+      const startX = Math.max(0, Math.min(1, (regionStartRef.current.x - currentVisualLeft) / imgRect.width));
+      const startY = Math.max(0, Math.min(1, (regionStartRef.current.y - currentVisualTop) / imgRect.height));
+      const endXNorm = Math.max(0, Math.min(1, (regionCurrentRef.current.x - currentVisualLeft) / imgRect.width));
+      const endYNorm = Math.max(0, Math.min(1, (regionCurrentRef.current.y - currentVisualTop) / imgRect.height));
+      
+      const regionWidth = Math.abs(endXNorm - startX);
+      const regionHeight = Math.abs(endYNorm - startY);
+      
+      if (regionWidth > 0.01 && regionHeight > 0.01) { // Minimum region size (1%)
+        const newZoomLevel = Math.max(1.5, Math.min(3.0, 1 / Math.max(regionWidth, regionHeight)));
+        
+        // Calculate center of region in normalized coordinates (0-1 relative to content)
+        const centerX = (startX + endXNorm) / 2;
+        const centerY = (startY + endYNorm) / 2;
+        
+        // Apply zoom first
+        await applyZoom(newZoomLevel, true);
+        
+        // Calculate pan to center the region using base rendered dimensions
+        const naturalRatio = img.naturalWidth / img.naturalHeight;
+        const visibleRatio = containerRect.width / containerRect.height;
+        let baseRenderedWidth: number;
+        let baseRenderedHeight: number;
+        
+        if (visibleRatio > naturalRatio) {
+          baseRenderedHeight = containerRect.height;
+          baseRenderedWidth = containerRect.height * naturalRatio;
+        } else {
+          baseRenderedWidth = containerRect.width;
+          baseRenderedHeight = containerRect.width / naturalRatio;
+        }
+        
+        // Pan offset = (0.5 - centerX) * baseWidth * newZoom
+        const panX = (0.5 - centerX) * baseRenderedWidth * newZoomLevel;
+        const panY = (0.5 - centerY) * baseRenderedHeight * newZoomLevel;
+        
+        // Update pan state
+        setZoomState((prev) => ({
+          ...prev,
+          panX: panX,
+          panY: panY,
+        }));
+        
+        // Broadcast pan update
+        if (broadcastChannelRef.current) {
+          broadcastChannelRef.current.postMessage({
+            type: 'STATE_UPDATE',
+            index: currentSlideIndex,
+            isSpotlight: isSpotlightActive,
+            mode: mode,
+            isLaserActive: isLaserActive,
+            laserPosition: laserPosition,
+            zoomState: {
+              level: newZoomLevel,
+              panX: panX,
+              panY: panY,
+            },
+          } as SyncMessage);
+        }
+      }
+      
+      setIsRegionSelecting(false);
+      setRegionStart(null);
+      setRegionCurrent(null);
+    };
+
+    window.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseUp, true);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseUp, true);
+      isDraggingRef.current = false;
+    };
+  }, [isRegionSelecting, mode, isDualScreen, applyZoom, currentSlideIndex, isSpotlightActive, isLaserActive, laserPosition]);
 
   // --- Render Logic ---
 
@@ -297,21 +780,51 @@ const App: React.FC = () => {
               style={{ width: `${mainWidth}%` }}
             >
                <img 
-                 src={slides[currentSlideIndex].src} 
-                 className="w-full h-full object-contain"
+                 src={zoomedSlideSrc && zoomedSlideRef.current === slides[currentSlideIndex].id 
+                   ? zoomedSlideSrc 
+                   : slides[currentSlideIndex].src} 
+                 className="w-full h-full object-contain transition-transform duration-200"
                  alt={slides[currentSlideIndex].name}
+                 style={{
+                   transform: zoomState.level > 1.0 
+                     ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
+                     : 'none',
+                   transformOrigin: 'center center',
+                 }}
                />
                <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30">
                  LIVE ON PROJECTOR
                </div>
+               {isRegionSelecting && (
+                 <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
+                   <Search className="w-4 h-4" />
+                   <span>Click, drag & release to zoom</span>
+                 </div>
+               )}
                <LinkOverlay 
                  links={slides[currentSlideIndex].links || []} 
                  containerRef={presenterSlideRef}
                  onNavigate={selectSlide}
                  disabled={isSpotlightActive || isLaserActive}
+                 zoomLevel={zoomState.level}
+                 panX={zoomState.panX}
+                 panY={zoomState.panY}
+               />
+               <RegionSelector
+                 isActive={isRegionSelecting}
+                 start={regionStart}
+                 current={regionCurrent}
+                 containerRef={presenterSlideRef}
                />
                <SpotlightLayer isActive={isSpotlightActive} />
-               <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={presenterSlideRef} />
+               <LaserPointer 
+                 isActive={isLaserActive} 
+                 position={laserPosition} 
+                 containerRef={presenterSlideRef} 
+                 zoomLevel={zoomState.level}
+                 panX={zoomState.panX}
+                 panY={zoomState.panY}
+               />
             </div>
             
             {/* Resize Handle (Vertical) */}
@@ -389,12 +902,14 @@ const App: React.FC = () => {
                 isSpotlight={isSpotlightActive}
                 isLaser={isLaserActive}
                 startTime={startTime}
+                zoomLevel={zoomState.level}
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
                 toggleLaser={toggleLaser}
                 toggleDualScreen={openDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
+                onAboutClick={() => setShowAbout(true)}
             />
         </div>
       </div>
@@ -414,18 +929,48 @@ const App: React.FC = () => {
           className="w-full h-full flex items-center justify-center"
         >
           <img 
-            src={slides[currentSlideIndex].src} 
-            className="w-full h-full object-contain"
+            src={zoomedSlideSrc && zoomedSlideRef.current === slides[currentSlideIndex].id 
+              ? zoomedSlideSrc 
+              : slides[currentSlideIndex].src} 
+            className="w-full h-full object-contain transition-transform duration-200"
             alt={slides[currentSlideIndex].name}
+            style={{
+              transform: zoomState.level > 1.0 
+                ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
+                : 'none',
+              transformOrigin: 'center center',
+            }}
           />
           <LinkOverlay 
             links={slides[currentSlideIndex].links || []} 
             containerRef={normalViewRef}
             onNavigate={selectSlide}
             disabled={isSpotlightActive || isLaserActive}
+            zoomLevel={zoomState.level}
+            panX={zoomState.panX}
+            panY={zoomState.panY}
+          />
+          {isRegionSelecting && (
+            <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
+              <Search className="w-4 h-4" />
+              <span>Click, drag & release to zoom</span>
+            </div>
+          )}
+          <RegionSelector
+            isActive={isRegionSelecting}
+            start={regionStart}
+            current={regionCurrent}
+            containerRef={normalViewRef}
           />
           <SpotlightLayer isActive={isSpotlightActive} />
-          <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={normalViewRef} />
+          <LaserPointer 
+            isActive={isLaserActive} 
+            position={laserPosition} 
+            containerRef={normalViewRef} 
+            zoomLevel={zoomState.level}
+            panX={zoomState.panX}
+            panY={zoomState.panY}
+          />
         </motion.div>
       </AnimatePresence>
 
@@ -436,12 +981,14 @@ const App: React.FC = () => {
         isSpotlight={isSpotlightActive}
         isLaser={isLaserActive}
         startTime={startTime}
+        zoomLevel={zoomState.level}
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
         toggleLaser={toggleLaser}
         toggleDualScreen={openDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}
+        onAboutClick={() => setShowAbout(true)}
       />
 
       {/* Overview Mode */}
@@ -480,6 +1027,9 @@ const App: React.FC = () => {
           </div>
         </motion.div>
       )}
+
+      {/* About Modal */}
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </div>
   );
 };
