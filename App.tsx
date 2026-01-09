@@ -280,14 +280,14 @@ const App: React.FC = () => {
     const nextIndex = Math.min(currentSlideIndex + 1, slides.length - 1);
     
     return (
-      <div className="w-full h-screen bg-neutral-900 text-white flex flex-col overflow-hidden">
+      <div className={`w-full h-screen bg-neutral-900 text-white flex flex-col overflow-hidden ${isLaserActive ? 'cursor-none' : ''}`}>
         {/* Presenter Dashboard */}
         <div className="flex-1 flex gap-4 p-4 h-full presenter-container">
             
             {/* Main Slide (Left, Resizable) */}
             <div 
               ref={presenterSlideRef}
-              className="bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700"
+              className={`bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700 ${isLaserActive ? 'cursor-none' : ''}`}
               style={{ width: `${mainWidth}%` }}
             >
                <img 
@@ -391,7 +391,7 @@ const App: React.FC = () => {
 
   // --- Normal Presentation View ---
   return (
-    <div ref={normalViewRef} className="w-full h-screen bg-black text-white relative overflow-hidden normal-presentation-container">
+    <div ref={normalViewRef} className={`w-full h-screen bg-black text-white relative overflow-hidden normal-presentation-container ${isLaserActive ? 'cursor-none' : ''}`}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlideIndex}

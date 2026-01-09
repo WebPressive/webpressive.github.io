@@ -73,7 +73,7 @@ const ReceiverView: React.FC = () => {
   // The receiver mimics the logic of the main App for displaying slides
   // But without controls or overview interactions
   return (
-    <div ref={receiverContainerRef} className={clsx("relative w-full h-screen bg-black overflow-hidden select-none receiver-container", isSpotlight ? "cursor-none" : "cursor-default")}>
+    <div ref={receiverContainerRef} className={clsx("relative w-full h-screen bg-black overflow-hidden select-none receiver-container", (isSpotlight || isLaser) ? "cursor-none" : "cursor-default")}>
       <AnimatePresence mode="wait">
         {mode === AppMode.PRESENTATION && (
           <motion.div
