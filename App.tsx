@@ -38,6 +38,7 @@ const App: React.FC = () => {
   // Dual Screen State
   const [isDualScreen, setIsDualScreen] = useState(false);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+  const receiverWindowRef = useRef<Window | null>(null);
   
   // Resizable panels state
   const [mainWidth, setMainWidth] = useState(66.67); // Percentage
@@ -111,10 +112,34 @@ const App: React.FC = () => {
     }
   }, [currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isReceiver, isLaserActive, laserPosition, zoomState]);
 
-  const openDualScreen = () => {
-    window.open(`${window.location.pathname}?mode=receiver`, 'WebPressiveReceiver', 'width=800,height=600');
-    setIsDualScreen(true);
-  };
+  const toggleDualScreen = useCallback(() => {
+    if (isDualScreen && receiverWindowRef.current) {
+      // Close dual-screen mode
+      receiverWindowRef.current.close();
+      receiverWindowRef.current = null;
+      setIsDualScreen(false);
+    } else {
+      // Open dual-screen mode
+      const receiverWindow = window.open(
+        `${window.location.pathname}?mode=receiver`, 
+        'WebPressiveReceiver', 
+        'width=800,height=600'
+      );
+      if (receiverWindow) {
+        receiverWindowRef.current = receiverWindow;
+        setIsDualScreen(true);
+        
+        // Check if window was closed by user (manually)
+        const checkWindowClosed = setInterval(() => {
+          if (receiverWindow.closed) {
+            clearInterval(checkWindowClosed);
+            receiverWindowRef.current = null;
+            setIsDualScreen(false);
+          }
+        }, 500);
+      }
+    }
+  }, [isDualScreen]);
 
   // --- Navigation Logic ---
   const startPresentation = (newSlides: SlideData[]) => {
@@ -475,7 +500,7 @@ const App: React.FC = () => {
         case 'd':
         case 'D':
           if (mode === AppMode.PRESENTATION) {
-            openDualScreen();
+            toggleDualScreen();
           }
           break;
         case 'f':
@@ -632,7 +657,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen]);
 
   // Mouse wheel zoom (Mode B) - Shift + Wheel
   useEffect(() => {
@@ -883,6 +908,11 @@ const App: React.FC = () => {
     return <UploadScreen onSlidesLoaded={startPresentation} />;
   }
 
+  // Safety check: if no slides loaded, show upload screen
+  if (slides.length === 0) {
+    return <UploadScreen onSlidesLoaded={startPresentation} />;
+  }
+
   // --- Presenter View (Dual Screen Active) ---
   if (isDualScreen && mode === AppMode.PRESENTATION) {
     const nextIndex = Math.min(currentSlideIndex + 1, slides.length - 1);
@@ -1032,7 +1062,7 @@ const App: React.FC = () => {
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
                 toggleLaser={toggleLaser}
-                toggleDualScreen={openDualScreen}
+                toggleDualScreen={toggleDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
                 onAboutClick={() => setShowAbout(true)}
@@ -1118,7 +1148,7 @@ const App: React.FC = () => {
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
         toggleLaser={toggleLaser}
-        toggleDualScreen={openDualScreen}
+        toggleDualScreen={toggleDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}
         onAboutClick={() => setShowAbout(true)}
