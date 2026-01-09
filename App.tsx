@@ -5,6 +5,7 @@ import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
 import SpotlightLayer from './components/SpotlightLayer';
 import LaserPointer from './components/LaserPointer';
+import LinkOverlay from './components/LinkOverlay';
 import ReceiverView from './components/ReceiverView';
 import { clsx } from 'clsx';
 
@@ -236,14 +237,19 @@ const App: React.FC = () => {
           e.preventDefault();
           toggleOverview();
           break;
-        case 'z':
-        case 'Z':
-        case 's': 
+        case 's':
+        case 'S':
           toggleSpotlight();
           break;
         case 'l':
         case 'L':
           toggleLaser();
+          break;
+        case 'd':
+        case 'D':
+          if (mode === AppMode.PRESENTATION) {
+            openDualScreen();
+          }
           break;
         case 'f':
         case 'F':
@@ -263,7 +269,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, isSpotlightActive, isLaserActive]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, openDualScreen, isSpotlightActive, isLaserActive]);
 
   // --- Render Logic ---
 
@@ -298,6 +304,12 @@ const App: React.FC = () => {
                <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30">
                  LIVE ON PROJECTOR
                </div>
+               <LinkOverlay 
+                 links={slides[currentSlideIndex].links || []} 
+                 containerRef={presenterSlideRef}
+                 onNavigate={selectSlide}
+                 disabled={isSpotlightActive || isLaserActive}
+               />
                <SpotlightLayer isActive={isSpotlightActive} />
                <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={presenterSlideRef} />
             </div>
@@ -405,6 +417,12 @@ const App: React.FC = () => {
             src={slides[currentSlideIndex].src} 
             className="w-full h-full object-contain"
             alt={slides[currentSlideIndex].name}
+          />
+          <LinkOverlay 
+            links={slides[currentSlideIndex].links || []} 
+            containerRef={normalViewRef}
+            onNavigate={selectSlide}
+            disabled={isSpotlightActive || isLaserActive}
           />
           <SpotlightLayer isActive={isSpotlightActive} />
           <LaserPointer isActive={isLaserActive} position={laserPosition} containerRef={normalViewRef} />

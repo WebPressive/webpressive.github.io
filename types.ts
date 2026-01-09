@@ -1,3 +1,14 @@
+export interface PDFLink {
+  // Normalized coordinates (0-1 range relative to page dimensions)
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // Link destination
+  url?: string; // External URL
+  dest?: number; // Internal page number (0-indexed)
+}
+
 export interface SlideData {
   id: string;
   src: string;
@@ -5,6 +16,7 @@ export interface SlideData {
   file?: File; // Needed to transfer blob data between windows
   imageData?: string; // Base64 image data for sharing via BroadcastChannel
   notes?: string; // Speaker notes from Beamer PDF
+  links?: PDFLink[]; // Embedded links from PDF
 }
 
 export enum AppMode {

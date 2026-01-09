@@ -209,12 +209,16 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <span>Overview</span>
           </div>
           <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">Z</span>
+            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">S</span>
             <span>Spotlight</span>
           </div>
           <div className="flex items-center space-x-2">
             <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">L</span>
             <span>Laser Pointer</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">D</span>
+            <span>Dual Screen</span>
           </div>
           <div className="flex items-center space-x-2">
             <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">F</span>

@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { SlideData } from '../types';
+import { SlideData, PDFLink } from '../types';
 
 // Configure PDF.js worker for Vite
 // Use CDN for reliability (Vite can have issues with worker imports)
@@ -11,10 +11,134 @@ export interface PDFPageData {
   blobUrl: string;
   imageData: string; // Base64 data URL for sharing
   notes?: string; // Extracted speaker notes
+  links?: PDFLink[]; // Embedded links
 }
 
 // Store for notes loaded from PDF metadata
 let metadataNotes: Record<string, string> = {};
+
+/**
+ * Extracts link annotations from a PDF page
+ * @param page - The PDF page object
+ * @param pdf - The PDF document (for resolving internal destinations)
+ * @returns Promise resolving to an array of PDFLink objects
+ */
+async function extractLinksFromPage(page: any, pdf: any): Promise<PDFLink[]> {
+  const links: PDFLink[] = [];
+  
+  try {
+    const annotations = await page.getAnnotations();
+    const viewport = page.getViewport({ scale: 1.0 });
+    const pageWidth = viewport.width;
+    const pageHeight = viewport.height;
+    
+    for (const annotation of annotations) {
+      // Only process link annotations
+      if (annotation.subtype !== 'Link') continue;
+      
+      // Get the rectangle (position) of the link
+      // rect is [x1, y1, x2, y2] in PDF coordinates (origin at bottom-left)
+      const rect = annotation.rect;
+      if (!rect || rect.length < 4) continue;
+
+      // IMPORTANT: PDF coordinates need to be transformed into viewport coordinates
+      // to account for rotation, cropBox/viewBox offsets, etc.
+      // This returns [x1, y1, x2, y2] in viewport coords where origin is top-left.
+      const [vx1, vy1, vx2, vy2] = viewport.convertToViewportRectangle(rect);
+
+      const left = Math.min(vx1, vx2);
+      const top = Math.min(vy1, vy2);
+      const right = Math.max(vx1, vx2);
+      const bottom = Math.max(vy1, vy2);
+
+      // Normalize to 0-1 range relative to the page viewport
+      const x = left / pageWidth;
+      const y = top / pageHeight;
+      const width = (right - left) / pageWidth;
+      const height = (bottom - top) / pageHeight;
+
+      // Skip tiny/invalid rectangles
+      if (!isFinite(x) || !isFinite(y) || !isFinite(width) || !isFinite(height)) continue;
+      if (width <= 0 || height <= 0) continue;
+
+      const link: PDFLink = { x, y, width, height };
+      
+      // Check for external URL
+      if (annotation.url) {
+        link.url = annotation.url;
+        links.push(link);
+        continue;
+      }
+      
+      // Check for internal destination (page reference)
+      if (annotation.dest) {
+        try {
+          // dest can be a string name or an array
+          let destArray = annotation.dest;
+          if (typeof destArray === 'string') {
+            // Resolve named destination
+            const destRef = await pdf.getDestination(destArray);
+            if (destRef) {
+              destArray = destRef;
+            }
+          }
+          
+          if (Array.isArray(destArray) && destArray.length > 0) {
+            // First element is a reference to the page
+            const pageRef = destArray[0];
+            if (pageRef) {
+              // Get the page index from the reference
+              const pageIndex = await pdf.getPageIndex(pageRef);
+              if (typeof pageIndex === 'number') {
+                link.dest = pageIndex; // 0-indexed page number
+                links.push(link);
+              }
+            }
+          }
+        } catch (e) {
+          console.debug('Failed to resolve internal link destination:', e);
+        }
+        continue;
+      }
+      
+      // Check for action-based links (GoTo actions)
+      if (annotation.action) {
+        const action = annotation.action;
+        if (action.action === 'GoTo' && action.dest) {
+          try {
+            let destArray = action.dest;
+            if (typeof destArray === 'string') {
+              const destRef = await pdf.getDestination(destArray);
+              if (destRef) {
+                destArray = destRef;
+              }
+            }
+            
+            if (Array.isArray(destArray) && destArray.length > 0) {
+              const pageRef = destArray[0];
+              if (pageRef) {
+                const pageIndex = await pdf.getPageIndex(pageRef);
+                if (typeof pageIndex === 'number') {
+                  link.dest = pageIndex;
+                  links.push(link);
+                }
+              }
+            }
+          } catch (e) {
+            console.debug('Failed to resolve GoTo action destination:', e);
+          }
+        } else if (action.action === 'URI' && action.uri) {
+          link.url = action.uri;
+          links.push(link);
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('Failed to extract links from page:', e);
+  }
+  
+  return links;
+}
 
 /**
  * Get note for a specific page (from PDF metadata)
@@ -290,12 +414,19 @@ export async function extractPagesFromPDF(
     // Note: toDataURL quality parameter only applies to JPEG, PNG is always lossless
     const imageData = canvas.toDataURL('image/png');
     
+    // Extract embedded links from the page
+    const links = await extractLinksFromPage(page, pdf);
+    if (links.length > 0) {
+      console.log(`Page ${pageNum}: Found ${links.length} embedded links`);
+    }
+    
     pages.push({
       pageNumber: pageNum,
       blob,
       blobUrl,
       imageData,
       notes,
+      links,
     });
   }
 
@@ -325,6 +456,8 @@ export async function pdfToSlides(
     imageData: page.imageData,
     // Store speaker notes if available
     notes: page.notes,
+    // Store embedded links
+    links: page.links,
   }));
 }
 

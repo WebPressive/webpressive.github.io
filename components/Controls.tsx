@@ -123,7 +123,7 @@ const Controls: React.FC<ControlsProps> = ({
         <button 
           onClick={toggleSpotlight} 
           className={clsx("p-2 rounded-xl transition-colors", isSpotlight ? "bg-yellow-600 text-white" : "hover:bg-white/10")}
-          title="Spotlight (Z)"
+          title="Spotlight (S)"
         >
           <Sun className="w-5 h-5" />
         </button>

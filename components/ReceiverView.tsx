@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { SlideData, SyncMessage, AppMode } from '../types';
 import SpotlightLayer from './SpotlightLayer';
 import LaserPointer from './LaserPointer';
+import LinkOverlay from './LinkOverlay';
 import { clsx } from 'clsx';
 
 const ReceiverView: React.FC = () => {
@@ -96,6 +97,12 @@ const ReceiverView: React.FC = () => {
                 layoutId={`slide-${slides[currentIndex].id}`}
               />
             </AnimatePresence>
+            {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
+            <LinkOverlay 
+              links={slides[currentIndex].links || []} 
+              containerRef={receiverContainerRef}
+              disabled={true}
+            />
           </motion.div>
         )}
       </AnimatePresence>
