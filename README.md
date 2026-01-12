@@ -25,7 +25,7 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 ## Demo Presentation
 
-The demo presentation is provided by the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template), which is included as a Git submodule. This template demonstrates:
+The demo presentation is provided by the [HRG Beamer Template](https://github.com/danielrherber/hrg-beamer-template), which is included as a Git submodule. This template demonstrates:
 - Speaker notes embedded in PDF metadata
 - LaTeX source code showing how to structure presentations with notes
 - Examples of various Beamer slide layouts and features
@@ -139,7 +139,7 @@ Open a synchronized receiver window that displays the current slide on a second 
 WebPressive automatically extracts speaker notes from Beamer PDFs. Notes are displayed in the presenter view sidebar and can be scrolled if they are long.
 
 **Demo Presentation with Speaker Notes:**
-The demo presentation uses the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template) (included as a Git submodule), which includes comprehensive speaker notes demonstrating how to structure and embed notes in LaTeX Beamer presentations. The template shows:
+The demo presentation uses the [HRG Beamer Template](https://github.com/danielrherber/hrg-beamer-template) (included as a Git submodule), which includes comprehensive speaker notes demonstrating how to structure and embed notes in LaTeX Beamer presentations. The template shows:
 - How to use the `\annotation{}` command in LaTeX source
 - How speaker notes are embedded in PDF metadata
 - Examples of speaker notes for various slide types
