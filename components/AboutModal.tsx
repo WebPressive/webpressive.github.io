@@ -212,6 +212,33 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>Real-time progress tracking during PDF loading</li>
                   </ul>
                 </div>
+
+                {/* Demo Presentation */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Demo Presentation</h3>
+                  <p className="text-neutral-300 text-sm mb-2">
+                    The demo presentation is provided by the <strong className="text-blue-400">HRG Beamer Template</strong>, 
+                    which demonstrates speaker notes embedded in PDF metadata.
+                  </p>
+                  <div className="bg-neutral-800/50 rounded-lg p-4 border border-neutral-700">
+                    <p className="text-sm text-neutral-300 mb-2">
+                      <strong className="text-blue-400">Original Repository:</strong>
+                    </p>
+                    <a 
+                      href="https://github.com/bankh/hrg-beamer-template" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 transition-colors text-sm break-all"
+                    >
+                      https://github.com/bankh/hrg-beamer-template
+                    </a>
+                    <p className="text-xs text-neutral-400 mt-2">
+                      The template is included as a Git submodule in this repository. The submodule version includes 
+                      comprehensive speaker notes showing how to structure and embed notes in LaTeX Beamer presentations. 
+                      View the LaTeX source code in the <code className="px-1 py-0.5 bg-neutral-900 rounded text-xs">hrg-beamer-template/</code> directory.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Footer with Copyright */}

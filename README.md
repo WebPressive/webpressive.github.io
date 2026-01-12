@@ -23,6 +23,28 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 - **Resizable Panels**: Customize presenter view layout (main slide, next slide preview, notes)
 - **Fullscreen Support**: Present in fullscreen mode
 
+## Demo Presentation
+
+The demo presentation is provided by the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template), which is included as a Git submodule. This template demonstrates:
+- Speaker notes embedded in PDF metadata
+- LaTeX source code showing how to structure presentations with notes
+- Examples of various Beamer slide layouts and features
+
+**To clone with the submodule:**
+```bash
+git clone --recurse-submodules git@github.com:WebPressive/webpressive.git
+```
+
+**If you already cloned without submodules:**
+```bash
+git submodule update --init --recursive
+```
+
+**To update the submodule to the latest version:**
+```bash
+git submodule update --remote hrg-beamer-template
+```
+
 ## Run Locally
 
 ### Option 1: Using Docker (Recommended for Development)
@@ -110,6 +132,14 @@ Open a synchronized receiver window that displays the current slide on a second 
 
 ### Speaker Notes
 WebPressive automatically extracts speaker notes from Beamer PDFs. Notes are displayed in the presenter view sidebar and can be scrolled if they are long.
+
+**Demo Presentation with Speaker Notes:**
+The demo presentation uses the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template) (included as a Git submodule), which includes comprehensive speaker notes demonstrating how to structure and embed notes in LaTeX Beamer presentations. The template shows:
+- How to use the `\annotation{}` command in LaTeX source
+- How speaker notes are embedded in PDF metadata
+- Examples of speaker notes for various slide types
+
+To view the LaTeX source code showing how speaker notes are created, see the `hrg-beamer-template/` directory (Git submodule).
 
 ### Zoom Functionality
 Three zoom modes are available:

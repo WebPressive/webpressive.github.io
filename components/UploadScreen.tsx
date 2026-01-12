@@ -132,8 +132,8 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
     setProgress({ current: 0, total: 0 });
 
     try {
-      // Fetch the demo PDF file
-      const response = await fetch('/demo/slides.pdf');
+      // Fetch the demo PDF file from HRG Beamer Template submodule
+      const response = await fetch('/hrg-beamer-template/slides.pdf');
       if (!response.ok) {
         throw new Error('Failed to load demo PDF');
       }
