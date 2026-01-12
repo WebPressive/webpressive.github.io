@@ -217,7 +217,12 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Demo Presentation</h3>
                   <p className="text-neutral-300 text-sm mb-2">
-                    The demo presentation is provided by the <strong className="text-blue-400">HRG Beamer Template</strong>, 
+                    The demo presentation is provided by the <a 
+                      href="https://github.com/bankh/hrg-beamer-template" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 transition-colors font-semibold"
+                    >HRG Beamer Template</a>, 
                     which demonstrates speaker notes embedded in PDF metadata.
                   </p>
                   <div className="bg-neutral-800/50 rounded-lg p-4 border border-neutral-700">
