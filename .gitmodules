@@ -1,3 +1,3 @@
-[submodule "hrg-beamer-template"]
-	path = hrg-beamer-template
+[submodule "public/hrg-beamer-template"]
+	path = public/hrg-beamer-template
 	url = git@github.com:bankh/hrg-beamer-template.git

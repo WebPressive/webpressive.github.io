@@ -35,14 +35,19 @@ The demo presentation is provided by the [HRG Beamer Template](https://github.co
 git clone --recurse-submodules git@github.com:WebPressive/webpressive.git
 ```
 
+The HRG Beamer Template submodule is located in `public/hrg-beamer-template/` and contains:
+- `slides.pdf` - The demo PDF used by WebPressive
+- LaTeX source files showing how to structure presentations with speaker notes
+- Examples of the `\annotation{}` command and PDF metadata embedding
+
 **If you already cloned without submodules:**
 ```bash
-git submodule update --init --recursive
+git submodule update --init --recursive public/hrg-beamer-template
 ```
 
 **To update the submodule to the latest version:**
 ```bash
-git submodule update --remote hrg-beamer-template
+git submodule update --remote public/hrg-beamer-template
 ```
 
 ## Run Locally

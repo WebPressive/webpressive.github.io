@@ -233,9 +233,9 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                       https://github.com/bankh/hrg-beamer-template
                     </a>
                     <p className="text-xs text-neutral-400 mt-2">
-                      The template is included as a Git submodule in this repository. The submodule version includes 
-                      comprehensive speaker notes showing how to structure and embed notes in LaTeX Beamer presentations. 
-                      View the LaTeX source code in the <code className="px-1 py-0.5 bg-neutral-900 rounded text-xs">hrg-beamer-template/</code> directory.
+                      The template is included as a Git submodule in this repository at <code className="px-1 py-0.5 bg-neutral-900 rounded text-xs">public/hrg-beamer-template/</code>. 
+                      The submodule version includes comprehensive speaker notes showing how to structure and embed notes in LaTeX Beamer presentations. 
+                      View the LaTeX source code and <code className="px-1 py-0.5 bg-neutral-900 rounded text-xs">slides.pdf</code> in the submodule directory.
                     </p>
                   </div>
                 </div>
