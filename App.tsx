@@ -49,6 +49,9 @@ const App: React.FC = () => {
   const presenterSlideRef = useRef<HTMLDivElement>(null);
   const normalViewRef = useRef<HTMLDivElement>(null);
   
+  // Ref for speaker notes container (for scrolling)
+  const speakerNotesRef = useRef<HTMLDivElement>(null);
+  
   // Zoom state
   const [zoomState, setZoomState] = useState<ZoomState>({ level: 1.0, panX: 0, panY: 0 });
   const [isZooming, setIsZooming] = useState(false);
@@ -222,12 +225,20 @@ const App: React.FC = () => {
   const nextSlide = useCallback(() => {
     setCurrentSlideIndex((prev) => Math.min(prev + 1, slides.length - 1));
     resetZoom(); // Reset zoom when changing slides
-  }, [slides.length, resetZoom]);
+    // Scroll speaker notes to top when in dual screen mode
+    if (isDualScreen && speakerNotesRef.current) {
+      speakerNotesRef.current.scrollTop = 0;
+    }
+  }, [slides.length, resetZoom, isDualScreen]);
 
   const prevSlide = useCallback(() => {
     setCurrentSlideIndex((prev) => Math.max(prev - 1, 0));
     resetZoom(); // Reset zoom when changing slides
-  }, [resetZoom]);
+    // Scroll speaker notes to top when in dual screen mode
+    if (isDualScreen && speakerNotesRef.current) {
+      speakerNotesRef.current.scrollTop = 0;
+    }
+  }, [resetZoom, isDualScreen]);
 
   const toggleOverview = useCallback(() => {
     setMode((prev) => {
@@ -254,6 +265,10 @@ const App: React.FC = () => {
     setCurrentSlideIndex(index);
     setMode(AppMode.PRESENTATION);
     resetZoom(); // Reset zoom when changing slides
+    // Scroll speaker notes to top when in dual screen mode
+    if (isDualScreen && speakerNotesRef.current) {
+      speakerNotesRef.current.scrollTop = 0;
+    }
   };
 
   const toggleSpotlight = useCallback(() => {
@@ -636,6 +651,30 @@ const App: React.FC = () => {
                 } as SyncMessage);
               }
               return { ...prev, panY: newPanY };
+            });
+          }
+          break;
+        case 't':
+        case 'T':
+          // Scroll speaker notes up (line-by-line) in dual screen mode
+          if (mode === AppMode.PRESENTATION && isDualScreen && speakerNotesRef.current) {
+            e.preventDefault();
+            const lineHeight = 24; // Approximate line height in pixels (adjust based on your CSS)
+            speakerNotesRef.current.scrollBy({
+              top: -lineHeight,
+              behavior: 'smooth'
+            });
+          }
+          break;
+        case 'g':
+        case 'G':
+          // Scroll speaker notes down (line-by-line) in dual screen mode
+          if (mode === AppMode.PRESENTATION && isDualScreen && speakerNotesRef.current) {
+            e.preventDefault();
+            const lineHeight = 24; // Approximate line height in pixels (adjust based on your CSS)
+            speakerNotesRef.current.scrollBy({
+              top: lineHeight,
+              behavior: 'smooth'
             });
           }
           break;
@@ -1028,10 +1067,14 @@ const App: React.FC = () => {
                   className="bg-neutral-800 rounded-2xl p-6 flex flex-col border border-neutral-700 overflow-hidden"
                   style={{ height: `${100 - nextHeight}%` }}
                 >
-                    <div className="flex-1 overflow-y-auto pr-2" style={{
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: '#525252 #262626'
-                    }}>
+                    <div 
+                      ref={speakerNotesRef}
+                      className="flex-1 overflow-y-auto pr-2" 
+                      style={{
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#525252 #262626'
+                      }}
+                    >
                         <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-3 sticky top-0 bg-neutral-800 pb-2">Speaker Notes</h2>
                         {slides[currentSlideIndex].notes ? (
                             <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed">

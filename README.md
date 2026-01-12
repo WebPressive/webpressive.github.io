@@ -108,6 +108,12 @@ The production build uses Nginx to serve the optimized static files.
 - **F**: Toggle fullscreen
 - **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
 
+### Speaker Notes (Dual-Screen Mode)
+- **T**: Scroll speaker notes up (line-by-line)
+- **G**: Scroll speaker notes down (line-by-line)
+
+> **Note:** Speaker notes automatically scroll to the top when navigating to a new slide in dual-screen mode.
+
 ### Zoom Controls
 - **1**: Zoom to 50%
 - **2**: Zoom to 100% (normal size)

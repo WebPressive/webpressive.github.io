@@ -128,6 +128,20 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     </div>
 
                     <div>
+                      <h4 className="text-sm font-semibold text-blue-400 mb-2">Speaker Notes (Dual-Screen Mode)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">T</kbd>
+                          <span>Scroll notes up (line-by-line)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd>
+                          <span>Scroll notes down (line-by-line)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
                       <h4 className="text-sm font-semibold text-blue-400 mb-2">Zoom Controls</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                         <div className="flex items-center gap-2">
@@ -193,6 +207,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">Z</kbd> then click and drag to zoom into a specific region</li>
                     <li>When zoomed, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">H</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">J</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">K</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">U</kbd> to pan, or right-click and drag</li>
                     <li>Use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">S</kbd> for spotlight or <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">L</kbd> for laser pointer</li>
+                    <li>In dual-screen mode, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">T</kbd> and <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd> to scroll speaker notes line-by-line</li>
                     <li>Click embedded links in the PDF to navigate or open external URLs</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">TAB</kbd> to see all slides in overview mode</li>
                   </ol>
