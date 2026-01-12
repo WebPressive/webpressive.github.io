@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, Info } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, Info, Pause, Play } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -11,6 +11,9 @@ interface ControlsProps {
   isLaser?: boolean;
   startTime: number | null;
   zoomLevel?: number;
+  isPaused?: boolean;
+  pausedTime?: number;
+  togglePause?: () => void;
   toggleOverview: () => void;
   toggleSpotlight: () => void;
   toggleLaser?: () => void;
@@ -29,6 +32,9 @@ const Controls: React.FC<ControlsProps> = ({
   isLaser = false,
   startTime,
   zoomLevel = 1.0,
+  isPaused = false,
+  pausedTime = 0,
+  togglePause,
   toggleOverview,
   toggleSpotlight,
   toggleLaser,
@@ -58,17 +64,27 @@ const Controls: React.FC<ControlsProps> = ({
     };
   }, []);
 
-  // Timer logic
+  // Timer logic (accounts for paused time)
   useEffect(() => {
     if (!startTime) return;
+    
+    // If paused, show the last calculated time without updating
+    if (isPaused) {
+      const diff = Math.floor((Date.now() - startTime - pausedTime) / 1000);
+      const m = Math.floor(diff / 60).toString().padStart(2, '0');
+      const s = (diff % 60).toString().padStart(2, '0');
+      setElapsed(`${m}:${s}`);
+      return;
+    }
+    
     const interval = setInterval(() => {
-      const diff = Math.floor((Date.now() - startTime) / 1000);
+      const diff = Math.floor((Date.now() - startTime - pausedTime) / 1000);
       const m = Math.floor(diff / 60).toString().padStart(2, '0');
       const s = (diff % 60).toString().padStart(2, '0');
       setElapsed(`${m}:${s}`);
     }, 1000);
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, isPaused, pausedTime]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -163,6 +179,16 @@ const Controls: React.FC<ControlsProps> = ({
             title="About (A)"
           >
             <Info className="w-5 h-5" />
+          </button>
+        )}
+
+        {togglePause && startTime && (
+          <button 
+            onClick={togglePause} 
+            className={clsx("p-2 rounded-xl transition-colors", isPaused ? "bg-yellow-600 text-white" : "hover:bg-white/10")}
+            title={isPaused ? "Resume (P)" : "Pause (P)"}
+          >
+            {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
           </button>
         )}
 

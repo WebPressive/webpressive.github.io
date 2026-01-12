@@ -106,6 +106,8 @@ The production build uses Nginx to serve the optimized static files.
 - **L**: Toggle laser pointer
 - **D**: Toggle dual-screen mode (receiver window)
 - **F**: Toggle fullscreen
+- **A**: Show about dialog (works in dual-screen mode)
+- **P**: Pause/Resume presentation timer
 - **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
 
 ### Speaker Notes (Dual-Screen Mode)

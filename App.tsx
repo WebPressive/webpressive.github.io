@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pausedTime, setPausedTime] = useState(0); // Accumulated paused time in milliseconds
+  const [pauseStartTime, setPauseStartTime] = useState<number | null>(null);
   
   // Dual Screen State
   const [isDualScreen, setIsDualScreen] = useState(false);
@@ -150,7 +153,29 @@ const App: React.FC = () => {
     setMode(AppMode.PRESENTATION);
     setStartTime(Date.now());
     setCurrentSlideIndex(0);
+    setIsPaused(false);
+    setPausedTime(0);
+    setPauseStartTime(null);
   };
+
+  // --- Timer Pause Logic ---
+  const togglePause = useCallback(() => {
+    if (!startTime) return;
+    
+    if (isPaused) {
+      // Resuming: add the paused duration to accumulated paused time
+      if (pauseStartTime) {
+        const pauseDuration = Date.now() - pauseStartTime;
+        setPausedTime(prev => prev + pauseDuration);
+        setPauseStartTime(null);
+      }
+      setIsPaused(false);
+    } else {
+      // Pausing: record when we started pausing
+      setPauseStartTime(Date.now());
+      setIsPaused(true);
+    }
+  }, [isPaused, startTime, pauseStartTime]);
 
   // Zoom functions
   const applyZoom = useCallback(async (zoomLevel: number, resetPan: boolean = false) => {
@@ -554,6 +579,12 @@ const App: React.FC = () => {
             setShowAbout(true);
           }
           break;
+        case 'p':
+        case 'P':
+          if (mode === AppMode.PRESENTATION && startTime) {
+            togglePause();
+          }
+          break;
         case 'h':
         case 'H':
           // Pan right (only when zoomed)
@@ -696,7 +727,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause]);
 
   // Mouse wheel zoom (Mode B) - Shift + Wheel
   useEffect(() => {
@@ -1102,6 +1133,9 @@ const App: React.FC = () => {
                 isLaser={isLaserActive}
                 startTime={startTime}
                 zoomLevel={zoomState.level}
+                isPaused={isPaused}
+                pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
+                togglePause={togglePause}
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
                 toggleLaser={toggleLaser}
@@ -1188,6 +1222,9 @@ const App: React.FC = () => {
         isLaser={isLaserActive}
         startTime={startTime}
         zoomLevel={zoomState.level}
+        isPaused={isPaused}
+        pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
+        togglePause={togglePause}
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
         toggleLaser={toggleLaser}
