@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, Plus, Minus } from 'lucide-react';
 import { SlideData, AppMode, SyncMessage, ZoomState } from './types';
 import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
@@ -54,6 +54,12 @@ const App: React.FC = () => {
   
   // Ref for speaker notes container (for scrolling)
   const speakerNotesRef = useRef<HTMLDivElement>(null);
+  
+  // Speaker notes font size state
+  const [speakerNotesFontSize, setSpeakerNotesFontSize] = useState(() => {
+    const saved = localStorage.getItem('speakerNotesFontSize');
+    return saved ? parseInt(saved, 10) : 14; // Default 14px
+  });
   
   // Zoom state
   const [zoomState, setZoomState] = useState<ZoomState>({ level: 1.0, panX: 0, panY: 0 });
@@ -158,6 +164,14 @@ const App: React.FC = () => {
     setPauseStartTime(null);
   };
 
+  // --- Timer Reset Logic ---
+  const resetTimer = useCallback(() => {
+    setStartTime(Date.now());
+    setIsPaused(false);
+    setPausedTime(0);
+    setPauseStartTime(null);
+  }, []);
+
   // --- Timer Pause Logic ---
   const togglePause = useCallback(() => {
     if (!startTime) return;
@@ -176,6 +190,23 @@ const App: React.FC = () => {
       setIsPaused(true);
     }
   }, [isPaused, startTime, pauseStartTime]);
+
+  // Speaker notes font size handlers
+  const increaseFontSize = useCallback(() => {
+    setSpeakerNotesFontSize((prev) => {
+      const newSize = Math.min(prev + 1, 24); // Max 24px
+      localStorage.setItem('speakerNotesFontSize', newSize.toString());
+      return newSize;
+    });
+  }, []);
+
+  const decreaseFontSize = useCallback(() => {
+    setSpeakerNotesFontSize((prev) => {
+      const newSize = Math.max(prev - 1, 8); // Min 8px
+      localStorage.setItem('speakerNotesFontSize', newSize.toString());
+      return newSize;
+    });
+  }, []);
 
   // Zoom functions
   const applyZoom = useCallback(async (zoomLevel: number, resetPan: boolean = false) => {
@@ -1108,16 +1139,38 @@ const App: React.FC = () => {
                     >
                         <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-3 sticky top-0 bg-neutral-800 pb-2">Speaker Notes</h2>
                         {slides[currentSlideIndex].notes ? (
-                            <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed">
+                            <div className="text-neutral-200 whitespace-pre-wrap leading-relaxed" style={{ fontSize: `${speakerNotesFontSize}px` }}>
                                 {slides[currentSlideIndex].notes}
                             </div>
                         ) : (
-                            <p className="text-sm text-neutral-500 italic">No notes available for this slide.</p>
+                            <p className="text-neutral-500 italic" style={{ fontSize: `${speakerNotesFontSize}px` }}>No notes available for this slide.</p>
                         )}
                     </div>
                     <div className="mt-4 pt-4 border-t border-neutral-700 flex-shrink-0">
-                        <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-1">Current Slide</h2>
-                        <p className="text-sm text-neutral-300 truncate">{slides[currentSlideIndex].name}</p>
+                        <div className="flex items-end justify-between">
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-1">Current Slide</h2>
+                                <p className="text-neutral-300 truncate" style={{ fontSize: `${speakerNotesFontSize}px` }}>{slides[currentSlideIndex].name}</p>
+                            </div>
+                            <div className="flex items-center gap-1 ml-4">
+                                <button
+                                    onClick={decreaseFontSize}
+                                    className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors text-neutral-400 hover:text-neutral-200"
+                                    title="Decrease font size"
+                                    aria-label="Decrease font size"
+                                >
+                                    <Minus size={16} />
+                                </button>
+                                <button
+                                    onClick={increaseFontSize}
+                                    className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors text-neutral-400 hover:text-neutral-200"
+                                    title="Increase font size"
+                                    aria-label="Increase font size"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1136,6 +1189,7 @@ const App: React.FC = () => {
                 isPaused={isPaused}
                 pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
                 togglePause={togglePause}
+                resetTimer={resetTimer}
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
                 toggleLaser={toggleLaser}
@@ -1225,6 +1279,7 @@ const App: React.FC = () => {
         isPaused={isPaused}
         pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
         togglePause={togglePause}
+        resetTimer={resetTimer}
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
         toggleLaser={toggleLaser}

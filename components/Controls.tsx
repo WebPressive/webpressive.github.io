@@ -14,6 +14,7 @@ interface ControlsProps {
   isPaused?: boolean;
   pausedTime?: number;
   togglePause?: () => void;
+  resetTimer?: () => void;
   toggleOverview: () => void;
   toggleSpotlight: () => void;
   toggleLaser?: () => void;
@@ -35,6 +36,7 @@ const Controls: React.FC<ControlsProps> = ({
   isPaused = false,
   pausedTime = 0,
   togglePause,
+  resetTimer,
   toggleOverview,
   toggleSpotlight,
   toggleLaser,
@@ -203,10 +205,21 @@ const Controls: React.FC<ControlsProps> = ({
           </>
         )}
 
-        <div className="flex items-center space-x-2 px-2">
+        {resetTimer && startTime ? (
+          <button
+            onClick={resetTimer}
+            className="flex items-center space-x-2 px-2 hover:bg-white/10 rounded-xl transition-colors"
+            title="Reset Timer (Click clock)"
+          >
             <Clock className="w-4 h-4 text-neutral-500" />
             <span className="text-sm font-mono text-neutral-300">{elapsed}</span>
-        </div>
+          </button>
+        ) : (
+          <div className="flex items-center space-x-2 px-2">
+            <Clock className="w-4 h-4 text-neutral-500" />
+            <span className="text-sm font-mono text-neutral-300">{elapsed}</span>
+          </div>
+        )}
       </div>
     </>
   );

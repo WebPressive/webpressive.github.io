@@ -339,13 +339,10 @@ export async function extractPagesFromPDF(
               // Convert to number - Beamer may store as 0-indexed or 1-indexed
               const pageNumFromMetadata = parseInt(pageNumStr, 10);
               if (!isNaN(pageNumFromMetadata)) {
-                // PDF.js uses 1-indexed pages, so if metadata is 0-indexed, add 1
-                // Try both interpretations to handle different Beamer versions
-                const pageNum1Indexed = pageNumFromMetadata + 1;
-                // Store with 1-indexed key (matching PDF.js page numbering)
-                parsedNotes[pageNum1Indexed.toString()] = noteText;
-                // Also store with original if it's already 1-indexed (for compatibility)
-                if (pageNumFromMetadata > 0 && pageNumFromMetadata <= 100) {
+                // Store using the exact page number from metadata
+                // We assume metadata uses 1-based indexing (standard for PDF)
+                // If the user provided 0-based, they should update their metadata generation
+                if (pageNumFromMetadata > 0) {
                   parsedNotes[pageNumFromMetadata.toString()] = noteText;
                 }
               }
@@ -373,13 +370,11 @@ export async function extractPagesFromPDF(
     
     // First check for notes from PDF metadata, then fall back to PDF annotation extraction
     // Note: pageNum is 1-indexed (PDF pages start at 1)
-    // If metadata uses 0-indexed, the notes for page N would be stored at key (N-1)
-    // So we check both the current page and page-1 to handle both cases
     let notes = getMetadataNote(pageNum);
-    if (!notes && pageNum > 1) {
-      // Try previous page number (in case metadata uses 0-indexed numbering)
-      notes = getMetadataNote(pageNum - 1);
-    }
+    
+    // Only try fallback if no notes found AND likely to be 0-indexed (rare)
+    // Removed automatic fallback to pageNum-1 to prevent shifting
+    
     if (!notes) {
       // Fall back to extracting from page annotations
       notes = await extractNotesFromPage(page);
