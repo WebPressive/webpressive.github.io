@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Plus, Minus } from 'lucide-react';
+import { Search, Plus, Minus, Eye } from 'lucide-react';
 import { SlideData, AppMode, SyncMessage, ZoomState } from './types';
 import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
@@ -59,6 +59,12 @@ const App: React.FC = () => {
   const [speakerNotesFontSize, setSpeakerNotesFontSize] = useState(() => {
     const saved = localStorage.getItem('speakerNotesFontSize');
     return saved ? parseInt(saved, 10) : 14; // Default 14px
+  });
+  
+  // Reading guide state
+  const [isReadingGuideEnabled, setIsReadingGuideEnabled] = useState(() => {
+    const saved = localStorage.getItem('isReadingGuideEnabled');
+    return saved === 'true';
   });
   
   // Zoom state
@@ -205,6 +211,19 @@ const App: React.FC = () => {
       const newSize = Math.max(prev - 1, 8); // Min 8px
       localStorage.setItem('speakerNotesFontSize', newSize.toString());
       return newSize;
+    });
+  }, []);
+
+  // Reading guide toggle
+  const toggleReadingGuide = useCallback(() => {
+    setIsReadingGuideEnabled((prev) => {
+      const newValue = !prev;
+      localStorage.setItem('isReadingGuideEnabled', newValue.toString());
+      // Reset scroll position to top when enabling the reading guide
+      if (newValue && speakerNotesRef.current) {
+        speakerNotesRef.current.scrollTop = 0;
+      }
+      return newValue;
     });
   }, []);
 
@@ -721,7 +740,7 @@ const App: React.FC = () => {
           // Scroll speaker notes up (line-by-line) in dual screen mode
           if (mode === AppMode.PRESENTATION && isDualScreen && speakerNotesRef.current) {
             e.preventDefault();
-            const lineHeight = 24; // Approximate line height in pixels (adjust based on your CSS)
+            const lineHeight = speakerNotesFontSize * 1.625; // Match leading-relaxed (1.625)
             speakerNotesRef.current.scrollBy({
               top: -lineHeight,
               behavior: 'smooth'
@@ -733,7 +752,7 @@ const App: React.FC = () => {
           // Scroll speaker notes down (line-by-line) in dual screen mode
           if (mode === AppMode.PRESENTATION && isDualScreen && speakerNotesRef.current) {
             e.preventDefault();
-            const lineHeight = 24; // Approximate line height in pixels (adjust based on your CSS)
+            const lineHeight = speakerNotesFontSize * 1.625; // Match leading-relaxed (1.625)
             speakerNotesRef.current.scrollBy({
               top: lineHeight,
               behavior: 'smooth'
@@ -1131,15 +1150,35 @@ const App: React.FC = () => {
                 >
                     <div 
                       ref={speakerNotesRef}
-                      className="flex-1 overflow-y-auto pr-2" 
+                      className="flex-1 overflow-y-auto pr-2 relative" 
                       style={{
                         scrollbarWidth: 'thin',
                         scrollbarColor: '#525252 #262626'
                       }}
                     >
-                        <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-3 sticky top-0 bg-neutral-800 pb-2">Speaker Notes</h2>
+                        <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-3 sticky top-0 bg-neutral-800 pb-2 z-20">Speaker Notes</h2>
+                        {/* Fixed Reading Guide Highlight - Stays at first line of text */}
+                        {isReadingGuideEnabled && (
+                            <div 
+                                className="sticky left-0 right-2 pointer-events-none z-10"
+                                style={{
+                                    top: '32px', // Position after heading (approx heading height)
+                                    height: `${speakerNotesFontSize * 1.625}px`, // Match line height
+                                    backgroundColor: 'rgba(156, 163, 175, 0.15)',
+                                    borderTop: '1px solid rgba(156, 163, 175, 0.3)',
+                                    borderBottom: '1px solid rgba(156, 163, 175, 0.3)',
+                                    marginBottom: `-${speakerNotesFontSize * 1.625}px` // Pull next content up under highlight
+                                }}
+                            />
+                        )}
                         {slides[currentSlideIndex].notes ? (
-                            <div className="text-neutral-200 whitespace-pre-wrap leading-relaxed" style={{ fontSize: `${speakerNotesFontSize}px` }}>
+                            <div 
+                                className="text-neutral-200 whitespace-pre-wrap leading-relaxed" 
+                                style={{ 
+                                    fontSize: `${speakerNotesFontSize}px`,
+                                    paddingBottom: isReadingGuideEnabled ? '80%' : '0' // Allow last line to scroll to highlight
+                                }}
+                            >
                                 {slides[currentSlideIndex].notes}
                             </div>
                         ) : (
@@ -1153,6 +1192,19 @@ const App: React.FC = () => {
                                 <p className="text-neutral-300 truncate" style={{ fontSize: `${speakerNotesFontSize}px` }}>{slides[currentSlideIndex].name}</p>
                             </div>
                             <div className="flex items-center gap-1 ml-4">
+                                <button
+                                    onClick={toggleReadingGuide}
+                                    className={clsx(
+                                        "p-1.5 rounded-md transition-colors",
+                                        isReadingGuideEnabled 
+                                            ? "bg-neutral-700 text-neutral-200" 
+                                            : "hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200"
+                                    )}
+                                    title={isReadingGuideEnabled ? "Disable reading guide" : "Enable reading guide"}
+                                    aria-label={isReadingGuideEnabled ? "Disable reading guide" : "Enable reading guide"}
+                                >
+                                    <Eye size={16} />
+                                </button>
                                 <button
                                     onClick={decreaseFontSize}
                                     className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors text-neutral-400 hover:text-neutral-200"
