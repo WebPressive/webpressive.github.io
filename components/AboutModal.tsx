@@ -142,6 +142,28 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd>
                           <span>Scroll notes down (line-by-line)</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">+</kbd>
+                          <span>Increase font size (button in notes panel)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">−</kbd>
+                          <span>Decrease font size (button in notes panel)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">👁</kbd>
+                          <span>Toggle reading guide (fixed highlight line)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-400 mb-2">Timer Controls</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">🕐</kbd>
+                          <span>Click clock to reset timer</span>
+                        </div>
                       </div>
                     </div>
 

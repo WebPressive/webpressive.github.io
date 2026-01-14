@@ -626,7 +626,7 @@ const App: React.FC = () => {
         case 'a':
         case 'A':
           if (mode === AppMode.PRESENTATION || mode === AppMode.OVERVIEW) {
-            setShowAbout(true);
+            setShowAbout(prev => !prev); // Toggle about modal
           }
           break;
         case 'p':
@@ -1251,6 +1251,9 @@ const App: React.FC = () => {
                 onAboutClick={() => setShowAbout(true)}
             />
         </div>
+
+        {/* About Modal - also available in dual-screen mode */}
+        <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
       </div>
     );
   }

@@ -113,8 +113,15 @@ The production build uses Nginx to serve the optimized static files.
 ### Speaker Notes (Dual-Screen Mode)
 - **T**: Scroll speaker notes up (line-by-line)
 - **G**: Scroll speaker notes down (line-by-line)
+- **+ button**: Increase font size (in notes panel)
+- **− button**: Decrease font size (in notes panel)
+- **Eye button**: Toggle reading guide (fixed highlight line for tracking)
 
-> **Note:** Speaker notes automatically scroll to the top when navigating to a new slide in dual-screen mode.
+> **Note:** Speaker notes automatically scroll to the top when navigating to a new slide in dual-screen mode. The reading guide helps you track your position while reading long notes.
+
+### Timer Controls
+- **P**: Pause/Resume presentation timer
+- **Click clock**: Reset timer to 00:00
 
 ### Zoom Controls
 - **1**: Zoom to 50%
