@@ -92,29 +92,30 @@ const ReceiverView: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-             {/* Using standard img instead of motion.img because framer-motion's 
-                 animate={{ x: 0 }} overrides the style.transform used for zoom */}
-              <img
-                key={`slide-${slides[currentIndex].id}`}
-                src={slides[currentIndex].src}
-                alt={slides[currentIndex].name}
-                className="w-full h-full object-contain transition-transform duration-200"
-                style={{
-                  transform: zoomState.level > 1.0
-                    ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
-                    : 'none',
-                  transformOrigin: 'center center',
-                }}
+             {/* Enforce 16:9 Aspect Ratio Container for Matching Viewport */}
+             <div className="relative w-full h-full flex items-center justify-center overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '100%' }}>
+                <img
+                  key={`slide-${slides[currentIndex].id}`}
+                  src={slides[currentIndex].src}
+                  alt={slides[currentIndex].name}
+                  className="w-auto h-auto max-w-full max-h-full object-contain transition-transform duration-200"
+                  style={{
+                    transform: zoomState.level > 1.0
+                      ? `scale(${zoomState.level}) translate(${zoomState.panX * 100}%, ${zoomState.panY * 100}%)`
+                      : 'none',
+                    transformOrigin: 'center center',
+                  }}
+                />
+              {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
+              <LinkOverlay 
+                links={slides[currentIndex].links || []} 
+                containerRef={receiverContainerRef}
+                disabled={true}
+                zoomLevel={zoomState.level}
+                panX={zoomState.panX}
+                panY={zoomState.panY}
               />
-            {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
-            <LinkOverlay 
-              links={slides[currentIndex].links || []} 
-              containerRef={receiverContainerRef}
-              disabled={true}
-              zoomLevel={zoomState.level}
-              panX={zoomState.panX}
-              panY={zoomState.panY}
-            />
+             </div>
           </motion.div>
         )}
       </AnimatePresence>

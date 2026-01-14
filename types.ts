@@ -35,8 +35,8 @@ export interface PresentationState {
 
 export interface ZoomState {
   level: number; // Zoom level (1.0 = 100%, 2.0 = 200%, etc.)
-  panX: number; // Pan offset X (in pixels)
-  panY: number; // Pan offset Y (in pixels)
+  panX: number; // Normalized Pan offset X (fraction of image width, e.g. 0.1 = 10%)
+  panY: number; // Normalized Pan offset Y (fraction of image height)
 }
 
 export type SyncMessage = 

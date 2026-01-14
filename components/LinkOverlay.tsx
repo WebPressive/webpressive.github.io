@@ -157,7 +157,7 @@ const LinkOverlay: React.FC<LinkOverlayProps> = ({
       style={{ 
         zIndex: 10,
         transform: zoomLevel > 1.0 
-          ? `scale(${zoomLevel}) translate(${panX / zoomLevel}px, ${panY / zoomLevel}px)`
+          ? `scale(${zoomLevel}) translate(${panX * 100}%, ${panY * 100}%)`
           : 'none',
         transformOrigin: 'center center',
       }}

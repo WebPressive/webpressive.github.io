@@ -640,7 +640,7 @@ const App: React.FC = () => {
           // Pan right (only when zoomed)
           if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
             e.preventDefault();
-            const panStep = 50; // pixels per keypress
+            const panStep = 0.05; // 5% shift
             setZoomState((prev) => {
               const newPanX = prev.panX + panStep;
               // Broadcast pan update
@@ -665,7 +665,7 @@ const App: React.FC = () => {
           // Pan up (only when zoomed)
           if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
             e.preventDefault();
-            const panStep = 50; // pixels per keypress
+            const panStep = 0.05; // 5% shift
             setZoomState((prev) => {
               const newPanY = prev.panY - panStep;
               // Broadcast pan update
@@ -690,7 +690,7 @@ const App: React.FC = () => {
           // Pan left (only when zoomed)
           if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
             e.preventDefault();
-            const panStep = 50; // pixels per keypress
+            const panStep = 0.05; // 5% shift
             setZoomState((prev) => {
               const newPanX = prev.panX - panStep;
               // Broadcast pan update
@@ -715,7 +715,7 @@ const App: React.FC = () => {
           // Pan down (only when zoomed)
           if (mode === AppMode.PRESENTATION && zoomState.level > 1.0) {
             e.preventDefault();
-            const panStep = 50; // pixels per keypress
+            const panStep = 0.05; // 5% shift
             setZoomState((prev) => {
               const newPanY = prev.panY + panStep;
               // Broadcast pan update
@@ -816,10 +816,60 @@ const App: React.FC = () => {
         const deltaX = e.clientX - panStart.x;
         const deltaY = e.clientY - panStart.y;
         
+        // Find current rendered width/height to normalize delta
+        let renderedWidth = 1000; // fallback
+        let renderedHeight = 1000;
+        
+        const container = (isDualScreen ? presenterSlideRef.current : normalViewRef.current) || document.body;
+        const img = container?.querySelector('img[class*="object-contain"]') as HTMLImageElement;
+        
+        if (img && img.naturalWidth) {
+          const rect = img.getBoundingClientRect();
+          // We need the rendered dimensions of the image *content*, which might be smaller than rect due to object-contain
+          // OR, if we fixed the img styling to be w-auto h-auto, rect is the content.
+          // Let's assume the new styling (w-auto h-auto max-w-full)
+          // But we haven't applied that styling change to the element yet in this update batch.
+          // So let's use the robust logic from spotlight calculation for now, or just rect if we update styling.
+          
+          // Using robust logic:
+          const naturalRatio = img.naturalWidth / img.naturalHeight;
+          const visibleRatio = rect.width / rect.height;
+          
+          if (visibleRatio > naturalRatio) {
+             renderedWidth = rect.height * naturalRatio;
+             renderedHeight = rect.height;
+          } else {
+             renderedWidth = rect.width;
+             renderedHeight = rect.width / naturalRatio;
+          }
+          
+          // Apply zoom level to get current rendered size on screen
+          // The rect from getBoundingClientRect ALREADY includes the scale transform!
+          // So rect.width IS the zoomed width.
+          // Wait.
+          // If we pan, we update panX/panY.
+          // We want to add (deltaX / ZoomedWidth) to panX?
+          // panX is fraction of ORIGINAL width.
+          // So we need deltaX / (OriginalWidth * ZoomLevel).
+          // Rect.width is (OriginalWidth * ZoomLevel).
+          // So deltaX / Rect.width is the fraction of *original width*.
+          // Wait.
+          // If 100% means width.
+          // Translate(10%) moves by 0.1 * Width * Scale pixels on screen.
+          // So if we move mouse by D pixels.
+          // D = Delta_Frac * Width * Scale.
+          // Delta_Frac = D / (Width * Scale).
+          // Width * Scale IS the current rect width.
+          // So yes: Delta_Frac = D / rect.width.
+          
+          renderedWidth = rect.width;
+          renderedHeight = rect.height;
+        }
+
         setZoomState((prev) => ({
           ...prev,
-          panX: prev.panX + deltaX,
-          panY: prev.panY + deltaY,
+          panX: prev.panX + (deltaX / renderedWidth),
+          panY: prev.panY + (deltaY / renderedHeight),
         }));
         
         setPanStart({ x: e.clientX, y: e.clientY });
@@ -836,8 +886,8 @@ const App: React.FC = () => {
             laserPosition: laserPosition,
             zoomState: {
               level: zoomState.level,
-              panX: zoomState.panX + deltaX,
-              panY: zoomState.panY + deltaY,
+              panX: zoomState.panX + (deltaX / renderedWidth),
+              panY: zoomState.panY + (deltaY / renderedHeight),
             },
           } as SyncMessage);
         }
@@ -957,23 +1007,9 @@ const App: React.FC = () => {
         // Apply zoom first
         await applyZoom(newZoomLevel, true);
         
-        // Calculate pan to center the region using base rendered dimensions
-        const naturalRatio = img.naturalWidth / img.naturalHeight;
-        const visibleRatio = containerRect.width / containerRect.height;
-        let baseRenderedWidth: number;
-        let baseRenderedHeight: number;
-        
-        if (visibleRatio > naturalRatio) {
-          baseRenderedHeight = containerRect.height;
-          baseRenderedWidth = containerRect.height * naturalRatio;
-        } else {
-          baseRenderedWidth = containerRect.width;
-          baseRenderedHeight = containerRect.width / naturalRatio;
-        }
-        
-        // Pan offset = (0.5 - centerX) * baseWidth * newZoom
-        const panX = (0.5 - centerX) * baseRenderedWidth * newZoomLevel;
-        const panY = (0.5 - centerY) * baseRenderedHeight * newZoomLevel;
+        // Pan offset = (0.5 - centerX)
+        const panX = (0.5 - centerX);
+        const panY = (0.5 - centerY);
         
         // Update pan state
         setZoomState((prev) => ({
@@ -1048,59 +1084,62 @@ const App: React.FC = () => {
               className={`bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700 ${isLaserActive ? 'cursor-none' : ''}`}
               style={{ width: `${mainWidth}%` }}
             >
-               <img 
-                 src={zoomedSlideSrc && zoomedSlideRef.current === slides[currentSlideIndex].id 
-                   ? zoomedSlideSrc 
-                   : slides[currentSlideIndex].src} 
-                 className="w-full h-full object-contain transition-transform duration-200"
-                 alt={slides[currentSlideIndex].name}
-                 style={{
-                   transform: zoomState.level > 1.0 
-                     ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
-                     : 'none',
-                   transformOrigin: 'center center',
-                 }}
-               />
-               <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30">
-                 LIVE ON PROJECTOR
-               </div>
-               {isRegionSelecting && (
-                 <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
-                   <Search className="w-4 h-4" />
-                   <span>Click, drag & release to zoom</span>
+               <div className="relative w-full h-full flex items-center justify-center overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '100%' }}>
+                 <img 
+                   src={zoomedSlideSrc && zoomedSlideRef.current === slides[currentSlideIndex].id 
+                     ? zoomedSlideSrc 
+                     : slides[currentSlideIndex].src} 
+                   className="w-auto h-auto max-w-full max-h-full object-contain transition-transform duration-200"
+                   alt={slides[currentSlideIndex].name}
+                   style={{
+                     transform: zoomState.level > 1.0 
+                       ? `scale(${zoomState.level}) translate(${zoomState.panX * 100}%, ${zoomState.panY * 100}%)`
+                       : 'none',
+                     transformOrigin: 'center center',
+                   }}
+                 />
+                 {/* Overlays inside the aspect-ratio container */}
+                 <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30 z-50">
+                   LIVE ON PROJECTOR
                  </div>
-               )}
-               <LinkOverlay 
-                 links={slides[currentSlideIndex].links || []} 
-                 containerRef={presenterSlideRef}
-                 onNavigate={selectSlide}
-                 disabled={isSpotlightActive || isLaserActive}
-                 zoomLevel={zoomState.level}
-                 panX={zoomState.panX}
-                 panY={zoomState.panY}
-               />
-               <RegionSelector
-                 isActive={isRegionSelecting}
-                 start={regionStart}
-                 current={regionCurrent}
-                 containerRef={presenterSlideRef}
-               />
-               <SpotlightLayer 
-                 isActive={isSpotlightActive} 
-                 position={spotlightPosition}
-                 containerRef={presenterSlideRef}
-                 zoomLevel={zoomState.level}
-                 panX={zoomState.panX}
-                 panY={zoomState.panY}
-               />
-               <LaserPointer 
-                 isActive={isLaserActive} 
-                 position={laserPosition} 
-                 containerRef={presenterSlideRef} 
-                 zoomLevel={zoomState.level}
-                 panX={zoomState.panX}
-                 panY={zoomState.panY}
-               />
+                 {isRegionSelecting && (
+                   <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
+                     <Search className="w-4 h-4" />
+                     <span>Click, drag & release to zoom</span>
+                   </div>
+                 )}
+                 <LinkOverlay 
+                   links={slides[currentSlideIndex].links || []} 
+                   containerRef={presenterSlideRef}
+                   onNavigate={selectSlide}
+                   disabled={isSpotlightActive || isLaserActive}
+                   zoomLevel={zoomState.level}
+                   panX={zoomState.panX}
+                   panY={zoomState.panY}
+                 />
+                 <RegionSelector
+                   isActive={isRegionSelecting}
+                   start={regionStart}
+                   current={regionCurrent}
+                   containerRef={presenterSlideRef}
+                 />
+                 <SpotlightLayer 
+                   isActive={isSpotlightActive} 
+                   position={spotlightPosition}
+                   containerRef={presenterSlideRef}
+                   zoomLevel={zoomState.level}
+                   panX={zoomState.panX}
+                   panY={zoomState.panY}
+                 />
+                 <LaserPointer 
+                   isActive={isLaserActive} 
+                   position={laserPosition} 
+                   containerRef={presenterSlideRef} 
+                   zoomLevel={zoomState.level}
+                   panX={zoomState.panX}
+                   panY={zoomState.panY}
+                 />
+               </div>
             </div>
             
             {/* Resize Handle (Vertical) */}
@@ -1274,11 +1313,11 @@ const App: React.FC = () => {
             src={zoomedSlideSrc && zoomedSlideRef.current === slides[currentSlideIndex].id 
               ? zoomedSlideSrc 
               : slides[currentSlideIndex].src} 
-            className="w-full h-full object-contain transition-transform duration-200"
+            className="w-auto h-auto max-w-full max-h-full object-contain transition-transform duration-200"
             alt={slides[currentSlideIndex].name}
             style={{
               transform: zoomState.level > 1.0 
-                ? `scale(${zoomState.level}) translate(${zoomState.panX / zoomState.level}px, ${zoomState.panY / zoomState.level}px)`
+                ? `scale(${zoomState.level}) translate(${zoomState.panX * 100}%, ${zoomState.panY * 100}%)`
                 : 'none',
               transformOrigin: 'center center',
             }}
