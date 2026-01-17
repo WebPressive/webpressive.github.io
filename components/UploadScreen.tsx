@@ -15,6 +15,24 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
   const [showAbout, setShowAbout] = useState(false);
   const clustrmapsRef = React.useRef<HTMLDivElement>(null);
 
+  // Load ClustrMaps globe
+  useEffect(() => {
+    if (!clustrmapsRef.current) return;
+
+    const script = document.createElement('script');
+    script.id = 'clstr_globe';
+    script.type = 'text/javascript';
+    script.src = 'https://clustrmaps.com/globe.js?d=lh_pbpBsSJdTCWJ6nm60pxdicJ1dPW0e6qPJ_hDl45M';
+    script.async = true;
+
+    clustrmapsRef.current.appendChild(script);
+
+    return () => {
+      const existing = document.getElementById('clstr_globe');
+      if (existing) existing.remove();
+    };
+  }, []);
+
   // Keyboard shortcut for About (A key)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -30,55 +48,6 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showAbout]);
 
-  // Load ClustrMaps script
-  useEffect(() => {
-    if (!clustrmapsRef.current) return;
-
-    // Check if script already exists to avoid duplicates
-    if (document.getElementById('clstr_globe')) {
-      return;
-    }
-
-    // Small delay to ensure container is rendered
-    const timer = setTimeout(() => {
-      if (!clustrmapsRef.current) return;
-
-      // Check if script already exists
-      if (document.getElementById('clstr_globe')) {
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.id = 'clstr_globe';
-      script.src = 'https://clustrmaps.com/globe.js?d=lh_pbpBsSJdTCWJ6nm60pxdicJ1dPW0e6qPJ_hDl45M';
-      script.async = true;
-      
-      // Append script directly to the container where we want the globe
-      clustrmapsRef.current.appendChild(script);
-      
-      script.onload = () => {
-        console.log('ClustrMaps script loaded');
-      };
-      
-      script.onerror = () => {
-        console.error('ClustrMaps script failed to load');
-      };
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-      // Cleanup: remove script on unmount
-      const existingScript = document.getElementById('clstr_globe');
-      if (existingScript && clustrmapsRef.current) {
-        try {
-          clustrmapsRef.current.removeChild(existingScript);
-        } catch (e) {
-          // Script may have already been removed
-        }
-      }
-    };
-  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -169,8 +138,8 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-8 relative">
-      <div className="max-w-2xl w-full text-center space-y-12 -mt-[15%] relative z-0">
+    <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center p-8 relative">
+      <div className="max-w-2xl w-full text-center space-y-12 relative z-10 flex flex-col items-center pt-2">
         <div className="space-y-4">
           <h1 className="text-6xl font-black tracking-tighter bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             WebPressive
@@ -265,55 +234,71 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
           </button>
         </div>
 
-        <div className="flex justify-center space-x-8 text-sm text-neutral-500">
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">TAB</span>
-            <span>Overview</span>
+        <div className="space-y-4 -mt-16">
+          {/* Keyboard Shortcuts */}
+          <div className="flex justify-center space-x-8 text-sm text-neutral-500">
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">TAB</span>
+              <span>Overview</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">S</span>
+              <span>Spotlight</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">L</span>
+              <span>Laser Pointer</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">D</span>
+              <span>Dual Screen</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">F</span>
+              <span>Fullscreen</span>
+            </div>
+            <button
+              onClick={() => setShowAbout(true)}
+              className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
+              title="About (A)"
+            >
+              <Info className="w-4 h-4" />
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">A</span>
+              <span>About</span>
+            </button>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">S</span>
-            <span>Spotlight</span>
+
+          {/* Standalone Version */}
+          <div className="flex justify-center items-center gap-4 text-sm relative z-50">
+            <span className="text-neutral-500">Standalone version:</span>
+            <a
+              href="https://github.com/WebPressive/webpressive/releases/tag/0.1.0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 transition-colors font-semibold underline cursor-pointer relative z-50"
+            >
+              v0.1.0
+            </a>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">L</span>
-            <span>Laser Pointer</span>
+
+          {/* ClustrMaps Globe - squeezed small */}
+          <div className="flex justify-center items-center w-full mt-2 mb-2">
+            <div
+              ref={clustrmapsRef}
+              style={{
+                width: '100px',
+                height: '60px',
+                transform: 'scale(0.4)',
+                transformOrigin: 'center center'
+              }}
+            />
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">D</span>
-            <span>Dual Screen</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">F</span>
-            <span>Fullscreen</span>
-          </div>
-          <button
-            onClick={() => setShowAbout(true)}
-            className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
-            title="About (A)"
-          >
-            <Info className="w-4 h-4" />
-            <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">A</span>
-            <span>About</span>
-          </button>
+
         </div>
       </div>
 
       {/* Footer - positioned at bottom */}
       <div className="absolute bottom-8 left-0 right-0 text-center z-20">
-        {/* ClustrMaps Globe */}
-        <div 
-          ref={clustrmapsRef} 
-          className="flex justify-center items-center overflow-visible relative" 
-          id="clustrmaps-container"
-          style={{ 
-            height: '200px',
-            width: '100%',
-            transform: 'scale(0.05) translateY(1700px)',
-            transformOrigin: 'center top',
-            zIndex: 30
-          }}
-        ></div>
-        
         <div className="space-y-4">
           <div className="text-sm text-neutral-600">
             <span>Inspired by </span>
