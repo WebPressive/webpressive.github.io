@@ -8,17 +8,17 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 ## 📦 Downloads
 
-**Latest Release: [v0.1.0](https://github.com/WebPressive/webpressive/releases/tag/v0.1.0)** (January 2026)
+**Latest Release: [v0.1.5](https://github.com/WebPressive/webpressive/releases/tag/v0.1.5)** (September 2026)
 
 Download the desktop application for your platform:
 
-- **Windows**: [WebPressive Setup 0.1.0.exe](https://github.com/WebPressive/webpressive/releases/download/v0.1.0/WebPressive%20Setup%200.1.0.exe) (102 MB)
-- **Linux**: [WebPressive-0.1.0.AppImage](https://github.com/WebPressive/webpressive/releases/download/v0.1.0/WebPressive-0.1.0.AppImage) (141 MB)
+- **Windows**: [WebPressive Setup 0.1.5.exe](https://github.com/WebPressive/webpressive/releases/download/v0.1.5/WebPressive%20Setup%200.1.5.exe) (102 MB)
+- **Linux**: [WebPressive-0.1.5.AppImage](https://github.com/WebPressive/webpressive/releases/download/v0.1.5/WebPressive-0.1.5.AppImage) (141 MB)
 
 ### Installation
 
 - **Windows**: Run the installer and follow the setup wizard
-- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.0.AppImage`) and run it
+- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.5.AppImage`) and run it
 
 For release notes and more information, visit the [Releases page](https://github.com/WebPressive/webpressive/releases).
 

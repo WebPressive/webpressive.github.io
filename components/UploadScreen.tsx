@@ -276,12 +276,12 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
           <div className="flex justify-center items-center gap-4 text-sm relative z-50">
             <span className="text-neutral-500">Standalone version:</span>
             <a
-              href="https://github.com/WebPressive/webpressive/releases/tag/0.1.0"
+              href="https://github.com/WebPressive/webpressive/releases/tag/v0.1.5"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 transition-colors font-semibold underline cursor-pointer relative z-50"
             >
-              v0.1.0
+              v0.1.5
             </a>
           </div>
 

@@ -299,12 +299,12 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <strong className="text-blue-400">Latest Release:</strong>
                       </p>
                       <a 
-                        href="https://github.com/WebPressive/webpressive/releases/tag/v0.1.0" 
+                        href="https://github.com/WebPressive/webpressive/releases/tag/v0.1.5" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
                       >
-                        v0.1.0 (January 2026)
+                        v0.1.5 (September 2026)
                       </a>
                     </div>
                     <div>
@@ -315,23 +315,23 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Windows: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.0/WebPressive%20Setup%200.1.0.exe" 
+                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.5/WebPressive%20Setup%200.1.5.exe" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive Setup 0.1.0.exe
+                            WebPressive Setup 0.1.5.exe
                           </a>
                         </div>
                         <div>
                           <span className="text-neutral-400">Linux: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.0/WebPressive-0.1.0.AppImage" 
+                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.5/WebPressive-0.1.5.AppImage" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive-0.1.0.AppImage
+                            WebPressive-0.1.5.AppImage
                           </a>
                         </div>
                       </div>
