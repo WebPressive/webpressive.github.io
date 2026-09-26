@@ -35,6 +35,11 @@ For release notes and more information, visit the [Releases page](https://github
   - Pan with right-click drag when zoomed
 - **Spotlight**: Dim the screen except for a highlighted area
 - **Laser Pointer**: Synchronized laser pointer across presenter and receiver screens
+- **Annotations**: Draw on slides with pen, highlighter, line, arrow, rectangle and ellipse tools, or click and type text notes
+  - Color and stroke width palette, undo/redo, clear slide / clear all
+  - Eraser removes just the part of a stroke under the cursor (shapes and text are removed whole)
+  - Strokes are mirrored live to the receiver window and follow zoom & pan
+  - Kept per slide and remembered across reloads of the same PDF
 - **Overview Mode**: Grid view of all slides for quick navigation
 - **Resizable Panels**: Customize presenter view layout (main slide, next slide preview, notes)
 - **Fullscreen Support**: Present in fullscreen mode

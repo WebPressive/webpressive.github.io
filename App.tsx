@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Plus, Minus, Eye } from 'lucide-react';
-import { SlideData, AppMode, SyncMessage, ZoomState } from './types';
+import { SlideData, AppMode, SyncMessage, ZoomState, Annotation, AnnotationMap, AnnotationTool } from './types';
 import UploadScreen from './components/UploadScreen';
 import Controls from './components/Controls';
 import SpotlightLayer from './components/SpotlightLayer';
@@ -10,8 +10,42 @@ import LinkOverlay from './components/LinkOverlay';
 import RegionSelector from './components/RegionSelector';
 import ReceiverView from './components/ReceiverView';
 import AboutModal from './components/AboutModal';
+import AnnotationLayer from './components/AnnotationLayer';
+import AnnotationToolbar from './components/AnnotationToolbar';
 import { renderPageAtZoom } from './utils/pdfUtils';
+import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, ANNOTATION_HISTORY_LIMIT, ANNOTATION_STORAGE_KEY } from './constants';
 import { clsx } from 'clsx';
+
+// Annotations are persisted per presentation; slide IDs are regenerated on every load,
+// so key storage by PDF name + slide count instead.
+const getAnnotationStorageKey = (slides: SlideData[]): string | null => {
+  if (slides.length === 0) return null;
+  const pdfName = slides[0].name.replace(/ - Slide \d+$/, '');
+  return `${pdfName}|${slides.length}`;
+};
+
+const loadStoredAnnotations = (key: string): AnnotationMap => {
+  try {
+    const all = JSON.parse(localStorage.getItem(ANNOTATION_STORAGE_KEY) || '{}');
+    return all[key] || {};
+  } catch {
+    return {};
+  }
+};
+
+const storeAnnotations = (key: string, annotations: AnnotationMap) => {
+  try {
+    const all = JSON.parse(localStorage.getItem(ANNOTATION_STORAGE_KEY) || '{}');
+    if (Object.values(annotations).some((list) => list.length > 0)) {
+      all[key] = annotations;
+    } else {
+      delete all[key];
+    }
+    localStorage.setItem(ANNOTATION_STORAGE_KEY, JSON.stringify(all));
+  } catch (error) {
+    console.warn('Could not persist annotations:', error);
+  }
+};
 
 const App: React.FC = () => {
   // --- Receiver Logic Check ---
@@ -33,6 +67,18 @@ const App: React.FC = () => {
   const [isLaserActive, setIsLaserActive] = useState(false);
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+
+  // Annotation state
+  const [isAnnotating, setIsAnnotating] = useState(false);
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>('pen');
+  const [annotationColor, setAnnotationColor] = useState(ANNOTATION_COLORS[0].value);
+  const [annotationWidth, setAnnotationWidth] = useState(ANNOTATION_WIDTHS[1].value);
+  const [annotations, setAnnotations] = useState<AnnotationMap>({});
+  const [annotationDraft, setAnnotationDraft] = useState<Annotation | null>(null);
+  const annotationsRef = useRef<AnnotationMap>({}); // Mirrors `annotations` for handlers that fire in quick succession
+  const annotationHistoryRef = useRef<{ past: AnnotationMap[]; future: AnnotationMap[] }>({ past: [], future: [] });
+  const loadedAnnotationKeyRef = useRef<string | null>(null);
+  const eraseGestureRecordedRef = useRef(false); // True once the current eraser drag has its undo snapshot
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [pausedTime, setPausedTime] = useState(0); // Accumulated paused time in milliseconds
@@ -108,11 +154,49 @@ const App: React.FC = () => {
           laserPosition: laserPosition,
           zoomState: zoomState
         } as SyncMessage);
+        channel.postMessage({ type: 'ANNOTATIONS_SYNC', annotations } as SyncMessage);
       }
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState, annotations]);
+
+  // Broadcast committed annotations (infrequent: on every stroke commit, erase, undo, clear)
+  useEffect(() => {
+    if (!isReceiver && broadcastChannelRef.current && mode !== AppMode.UPLOAD) {
+      broadcastChannelRef.current.postMessage({ type: 'ANNOTATIONS_SYNC', annotations } as SyncMessage);
+    }
+  }, [annotations, mode, isReceiver]);
+
+  // Broadcast the stroke being drawn so the receiver shows it live rather than on pointer-up
+  useEffect(() => {
+    if (!isReceiver && broadcastChannelRef.current && mode !== AppMode.UPLOAD) {
+      broadcastChannelRef.current.postMessage({
+        type: 'ANNOTATION_DRAFT',
+        index: currentSlideIndex,
+        annotation: annotationDraft,
+      } as SyncMessage);
+    }
+  }, [annotationDraft, currentSlideIndex, mode, isReceiver]);
+
+  // Load persisted annotations when a presentation starts; save on every change
+  const annotationStorageKey = getAnnotationStorageKey(slides);
+  useEffect(() => {
+    if (!annotationStorageKey) return;
+    const stored = loadStoredAnnotations(annotationStorageKey);
+    annotationsRef.current = stored;
+    annotationHistoryRef.current = { past: [], future: [] };
+    setAnnotations(stored);
+    setAnnotationDraft(null);
+    loadedAnnotationKeyRef.current = annotationStorageKey;
+  }, [annotationStorageKey]);
+
+  useEffect(() => {
+    // The ref check skips the commit in which a new presentation's annotations are still being loaded
+    if (annotationStorageKey && loadedAnnotationKeyRef.current === annotationStorageKey && annotations === annotationsRef.current) {
+      storeAnnotations(annotationStorageKey, annotations);
+    }
+  }, [annotations, annotationStorageKey]);
 
   // Broadcast state changes
   useEffect(() => {
@@ -349,9 +433,10 @@ const App: React.FC = () => {
   const toggleSpotlight = useCallback(() => {
     if (mode === AppMode.PRESENTATION) {
       setIsSpotlightActive((prev) => !prev);
-      // Turn off laser when spotlight is activated
+      // Turn off laser and annotation when spotlight is activated
       if (!isSpotlightActive) {
         setIsLaserActive(false);
+        setIsAnnotating(false);
       }
     }
   }, [mode, isSpotlightActive]);
@@ -359,12 +444,94 @@ const App: React.FC = () => {
   const toggleLaser = useCallback(() => {
     if (mode === AppMode.PRESENTATION) {
       setIsLaserActive((prev) => !prev);
-      // Turn off spotlight when laser is activated
+      // Turn off spotlight and annotation when laser is activated
       if (!isLaserActive) {
         setIsSpotlightActive(false);
+        setIsAnnotating(false);
       }
     }
   }, [mode, isLaserActive]);
+
+  // --- Annotation Logic ---
+  const toggleAnnotate = useCallback(() => {
+    if (mode !== AppMode.PRESENTATION) return;
+    if (!isAnnotating) {
+      // Annotation captures the pointer, so the other pointer tools must yield
+      setIsSpotlightActive(false);
+      setIsLaserActive(false);
+      setIsRegionSelecting(false);
+    } else {
+      setAnnotationDraft(null);
+    }
+    setIsAnnotating(!isAnnotating);
+  }, [mode, isAnnotating]);
+
+  // All edits go through here so undo/redo history stays consistent.
+  // `coalesce` folds successive edits of one eraser drag into a single undo step.
+  const updateAnnotations = useCallback((updater: (prev: AnnotationMap) => AnnotationMap, coalesce = false) => {
+    const prev = annotationsRef.current;
+    const next = updater(prev);
+    if (next === prev) return;
+    if (!(coalesce && eraseGestureRecordedRef.current)) {
+      const history = annotationHistoryRef.current;
+      history.past = [...history.past, prev].slice(-ANNOTATION_HISTORY_LIMIT);
+      history.future = [];
+    }
+    if (coalesce) eraseGestureRecordedRef.current = true;
+    annotationsRef.current = next;
+    setAnnotations(next);
+  }, []);
+
+  const endEraseGesture = useCallback(() => {
+    eraseGestureRecordedRef.current = false;
+  }, []);
+
+  const commitAnnotation = useCallback((annotation: Annotation) => {
+    updateAnnotations((prev) => ({
+      ...prev,
+      [currentSlideIndex]: [...(prev[currentSlideIndex] || []), annotation],
+    }));
+  }, [updateAnnotations, currentSlideIndex]);
+
+  // Replace one annotation with the pieces that survive the eraser (none = removed entirely)
+  const eraseAnnotation = useCallback((id: string, replacements: Annotation[] = []) => {
+    updateAnnotations((prev) => {
+      const list = prev[currentSlideIndex] || [];
+      if (!list.some((a) => a.id === id)) return prev;
+      return { ...prev, [currentSlideIndex]: list.flatMap((a) => (a.id === id ? replacements : [a])) };
+    }, true);
+  }, [updateAnnotations, currentSlideIndex]);
+
+  const clearSlideAnnotations = useCallback(() => {
+    updateAnnotations((prev) => {
+      if (!prev[currentSlideIndex]?.length) return prev;
+      const next = { ...prev };
+      delete next[currentSlideIndex];
+      return next;
+    });
+  }, [updateAnnotations, currentSlideIndex]);
+
+  const clearAllAnnotations = useCallback(() => {
+    updateAnnotations((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+  }, [updateAnnotations]);
+
+  const undoAnnotation = useCallback(() => {
+    const history = annotationHistoryRef.current;
+    const prev = history.past.pop();
+    if (!prev) return;
+    history.future = [annotationsRef.current, ...history.future];
+    annotationsRef.current = prev;
+    setAnnotations(prev);
+  }, []);
+
+  const redoAnnotation = useCallback(() => {
+    const history = annotationHistoryRef.current;
+    const next = history.future.shift();
+    if (!next) return;
+    history.past = [...history.past, annotationsRef.current];
+    annotationsRef.current = next;
+    setAnnotations(next);
+  }, []);
 
   // Track mouse position for spotlight and laser pointer (shared calculation logic)
   useEffect(() => {
@@ -491,6 +658,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (mode === AppMode.UPLOAD) return;
+
+      // Typing into a text annotation must not trigger single-letter shortcuts
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
+
+      // Annotation undo/redo (handled before the switch so Ctrl+Z doesn't trigger region zoom)
+      if ((e.ctrlKey || e.metaKey) && mode === AppMode.PRESENTATION) {
+        const key = e.key.toLowerCase();
+        if (key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redoAnnotation(); else undoAnnotation();
+          return;
+        }
+        if (key === 'y') {
+          e.preventDefault();
+          redoAnnotation();
+          return;
+        }
+      }
 
       switch (e.key) {
         case 'ArrowRight':
@@ -620,7 +806,26 @@ const App: React.FC = () => {
         case 'z':
         case 'Z':
           if (mode === AppMode.PRESENTATION && !isRegionSelecting) {
+            setIsAnnotating(false); // Region selection captures the pointer
             setIsRegionSelecting(true);
+          }
+          break;
+        case 'n':
+        case 'N':
+          toggleAnnotate();
+          break;
+        case 'e':
+        case 'E':
+          // Toggle eraser while annotating
+          if (isAnnotating) {
+            setAnnotationTool((prev) => (prev === 'eraser' ? 'pen' : 'eraser'));
+          }
+          break;
+        case 'c':
+        case 'C':
+          // Clear annotations on this slide; Shift+C clears every slide
+          if (isAnnotating) {
+            if (e.shiftKey) clearAllAnnotations(); else clearSlideAnnotations();
           }
           break;
         case 'a':
@@ -764,6 +969,9 @@ const App: React.FC = () => {
             setShowAbout(false);
           } else if (mode === AppMode.OVERVIEW) {
             setMode(AppMode.PRESENTATION);
+          } else if (isAnnotating) {
+            setIsAnnotating(false);
+            setAnnotationDraft(null);
           } else if (isSpotlightActive) {
             setIsSpotlightActive(false);
           } else if (isLaserActive) {
@@ -777,7 +985,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations]);
 
   // Mouse wheel zoom (Mode B) - Shift + Wheel
   useEffect(() => {
@@ -1060,6 +1268,47 @@ const App: React.FC = () => {
     return <ReceiverView />;
   }
 
+  const currentAnnotations = annotations[currentSlideIndex] || [];
+
+  // Shared by the dual-screen and normal presentation views
+  const annotationToolbar = isAnnotating && mode === AppMode.PRESENTATION ? (
+    <AnnotationToolbar
+      tool={annotationTool}
+      color={annotationColor}
+      strokeWidth={annotationWidth}
+      canUndo={annotationHistoryRef.current.past.length > 0}
+      canRedo={annotationHistoryRef.current.future.length > 0}
+      hasSlideAnnotations={currentAnnotations.length > 0}
+      onToolChange={setAnnotationTool}
+      onColorChange={setAnnotationColor}
+      onWidthChange={setAnnotationWidth}
+      onUndo={undoAnnotation}
+      onRedo={redoAnnotation}
+      onClearSlide={clearSlideAnnotations}
+      onClearAll={clearAllAnnotations}
+      onClose={toggleAnnotate}
+    />
+  ) : null;
+
+  const renderAnnotationLayer = (containerRef: React.RefObject<HTMLDivElement>) => (
+    <AnnotationLayer
+      annotations={currentAnnotations}
+      draft={annotationDraft}
+      containerRef={containerRef}
+      zoomLevel={zoomState.level}
+      panX={zoomState.panX}
+      panY={zoomState.panY}
+      editable={isAnnotating}
+      tool={annotationTool}
+      color={annotationColor}
+      strokeWidth={annotationWidth}
+      onDraftChange={setAnnotationDraft}
+      onCommit={commitAnnotation}
+      onErase={eraseAnnotation}
+      onEraseEnd={endEraseGesture}
+    />
+  );
+
   if (mode === AppMode.UPLOAD) {
     return <UploadScreen onSlidesLoaded={startPresentation} />;
   }
@@ -1108,15 +1357,16 @@ const App: React.FC = () => {
                      <span>Click, drag & release to zoom</span>
                    </div>
                  )}
-                 <LinkOverlay 
-                   links={slides[currentSlideIndex].links || []} 
+                 <LinkOverlay
+                   links={slides[currentSlideIndex].links || []}
                    containerRef={presenterSlideRef}
                    onNavigate={selectSlide}
-                   disabled={isSpotlightActive || isLaserActive}
+                   disabled={isSpotlightActive || isLaserActive || isAnnotating}
                    zoomLevel={zoomState.level}
                    panX={zoomState.panX}
                    panY={zoomState.panY}
                  />
+                 {renderAnnotationLayer(presenterSlideRef)}
                  <RegionSelector
                    isActive={isRegionSelecting}
                    start={regionStart}
@@ -1284,12 +1534,16 @@ const App: React.FC = () => {
                 toggleOverview={toggleOverview}
                 toggleSpotlight={toggleSpotlight}
                 toggleLaser={toggleLaser}
+                isAnnotating={isAnnotating}
+                toggleAnnotate={toggleAnnotate}
                 toggleDualScreen={toggleDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
                 onAboutClick={() => setShowAbout(true)}
             />
         </div>
+
+        {annotationToolbar}
 
         {/* About Modal - also available in dual-screen mode */}
         <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
@@ -1322,15 +1576,16 @@ const App: React.FC = () => {
               transformOrigin: 'center center',
             }}
           />
-          <LinkOverlay 
-            links={slides[currentSlideIndex].links || []} 
+          <LinkOverlay
+            links={slides[currentSlideIndex].links || []}
             containerRef={normalViewRef}
             onNavigate={selectSlide}
-            disabled={isSpotlightActive || isLaserActive}
+            disabled={isSpotlightActive || isLaserActive || isAnnotating}
             zoomLevel={zoomState.level}
             panX={zoomState.panX}
             panY={zoomState.panY}
           />
+          {renderAnnotationLayer(normalViewRef)}
           {isRegionSelecting && (
             <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
               <Search className="w-4 h-4" />
@@ -1377,11 +1632,15 @@ const App: React.FC = () => {
         toggleOverview={toggleOverview}
         toggleSpotlight={toggleSpotlight}
         toggleLaser={toggleLaser}
+        isAnnotating={isAnnotating}
+        toggleAnnotate={toggleAnnotate}
         toggleDualScreen={toggleDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}
         onAboutClick={() => setShowAbout(true)}
       />
+
+      {annotationToolbar}
 
       {/* Overview Mode */}
       {mode === AppMode.OVERVIEW && (

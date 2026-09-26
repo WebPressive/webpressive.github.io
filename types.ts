@@ -39,7 +39,33 @@ export interface ZoomState {
   panY: number; // Normalized Pan offset Y (fraction of image height)
 }
 
-export type SyncMessage = 
+// --- Annotations (on-slide ink) ---
+
+export type AnnotationTool = 'pen' | 'highlighter' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'text' | 'eraser';
+
+export interface AnnotationPoint {
+  // Normalized coordinates (0-1 range relative to the unzoomed slide image)
+  x: number;
+  y: number;
+}
+
+export interface Annotation {
+  id: string;
+  tool: Exclude<AnnotationTool, 'eraser'>;
+  color: string;
+  width: number; // Stroke width as a fraction of the slide image width (resolution independent)
+  // pen/highlighter: polyline; line/arrow/rect/ellipse: [start, end]; text: [top-left anchor]
+  points: AnnotationPoint[];
+  text?: string; // text tool only; '\n' separates lines
+  fontSize?: number; // text tool only; fraction of the slide image width
+}
+
+// Slide index -> annotations on that slide
+export type AnnotationMap = Record<number, Annotation[]>;
+
+export type SyncMessage =
   | { type: 'SYNC_REQUEST' }
   | { type: 'SYNC_INIT'; slides: SlideData[]; startTime: number | null }
-  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; spotlightPosition?: { x: number; y: number } | null; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState };
+  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; spotlightPosition?: { x: number; y: number } | null; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState }
+  | { type: 'ANNOTATIONS_SYNC'; annotations: AnnotationMap }
+  | { type: 'ANNOTATION_DRAFT'; index: number; annotation: Annotation | null };

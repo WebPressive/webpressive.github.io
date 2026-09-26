@@ -236,7 +236,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
 
         <div className="space-y-4 -mt-16">
           {/* Keyboard Shortcuts */}
-          <div className="flex justify-center space-x-8 text-sm text-neutral-500">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-neutral-500">
             <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">TAB</span>
               <span>Overview</span>
@@ -248,6 +248,10 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">L</span>
               <span>Laser Pointer</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">N</span>
+              <span>Annotate</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">D</span>

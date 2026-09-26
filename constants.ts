@@ -11,3 +11,26 @@ export const DEMO_SLIDES = [
 
 export const TRANSITION_DURATION = 0.5;
 export const SPOTLIGHT_SIZE = 200;
+
+// --- Annotations ---
+export const ANNOTATION_COLORS = [
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Yellow', value: '#facc15' },
+  { name: 'Black', value: '#171717' },
+  { name: 'White', value: '#fafafa' },
+];
+// Stroke widths as a fraction of slide image width (0.004 = 4px on a 1000px wide slide)
+export const ANNOTATION_WIDTHS = [
+  { name: 'Thin', value: 0.002 },
+  { name: 'Medium', value: 0.004 },
+  { name: 'Thick', value: 0.008 },
+];
+export const HIGHLIGHTER_WIDTH_FACTOR = 4;
+export const TEXT_SIZE_FACTOR = 6; // Text font size = selected stroke width × this
+export const TEXT_LINE_HEIGHT = 1.2;
+export const TEXT_FONT_FAMILY = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+export const HIGHLIGHTER_OPACITY = 0.45;
+export const ANNOTATION_HISTORY_LIMIT = 100;
+export const ANNOTATION_STORAGE_KEY = 'webpressive_annotations';

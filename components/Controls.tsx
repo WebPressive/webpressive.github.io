@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, Info, Pause, Play } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -18,6 +18,8 @@ interface ControlsProps {
   toggleOverview: () => void;
   toggleSpotlight: () => void;
   toggleLaser?: () => void;
+  isAnnotating?: boolean;
+  toggleAnnotate?: () => void;
   toggleDualScreen?: () => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -40,6 +42,8 @@ const Controls: React.FC<ControlsProps> = ({
   toggleOverview,
   toggleSpotlight,
   toggleLaser,
+  isAnnotating = false,
+  toggleAnnotate,
   toggleDualScreen,
   nextSlide,
   prevSlide,
@@ -159,7 +163,17 @@ const Controls: React.FC<ControlsProps> = ({
             <MousePointer2 className="w-5 h-5" />
           </button>
         )}
-        
+
+        {toggleAnnotate && (
+          <button
+            onClick={toggleAnnotate}
+            className={clsx("p-2 rounded-xl transition-colors", isAnnotating ? "bg-blue-600 text-white" : "hover:bg-white/10")}
+            title="Annotate (N)"
+          >
+            <PenLine className="w-5 h-5" />
+          </button>
+        )}
+
         {toggleDualScreen && (
           <button 
             onClick={toggleDualScreen} 

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SlideData, SyncMessage, AppMode, ZoomState } from '../types';
+import { SlideData, SyncMessage, AppMode, ZoomState, Annotation, AnnotationMap } from '../types';
 import SpotlightLayer from './SpotlightLayer';
 import LaserPointer from './LaserPointer';
 import LinkOverlay from './LinkOverlay';
+import AnnotationLayer from './AnnotationLayer';
 import { clsx } from 'clsx';
 
 const ReceiverView: React.FC = () => {
@@ -15,6 +16,8 @@ const ReceiverView: React.FC = () => {
   const [laserPosition, setLaserPosition] = useState<{ x: number; y: number } | null>(null);
   const [mode, setMode] = useState<AppMode>(AppMode.PRESENTATION);
   const [zoomState, setZoomState] = useState<ZoomState>({ level: 1.0, panX: 0, panY: 0 });
+  const [annotations, setAnnotations] = useState<AnnotationMap>({});
+  const [annotationDraft, setAnnotationDraft] = useState<{ index: number; annotation: Annotation | null }>({ index: 0, annotation: null });
   const receiverContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,6 +65,10 @@ const ReceiverView: React.FC = () => {
         if (msg.zoomState) {
           setZoomState(msg.zoomState);
         }
+      } else if (msg.type === 'ANNOTATIONS_SYNC') {
+        setAnnotations(msg.annotations);
+      } else if (msg.type === 'ANNOTATION_DRAFT') {
+        setAnnotationDraft({ index: msg.index, annotation: msg.annotation });
       }
     };
 
@@ -107,10 +114,19 @@ const ReceiverView: React.FC = () => {
                   }}
                 />
               {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
-              <LinkOverlay 
-                links={slides[currentIndex].links || []} 
+              <LinkOverlay
+                links={slides[currentIndex].links || []}
                 containerRef={receiverContainerRef}
                 disabled={true}
+                zoomLevel={zoomState.level}
+                panX={zoomState.panX}
+                panY={zoomState.panY}
+              />
+              {/* Presenter's ink, mirrored read-only */}
+              <AnnotationLayer
+                annotations={annotations[currentIndex] || []}
+                draft={annotationDraft.index === currentIndex ? annotationDraft.annotation : null}
+                containerRef={receiverContainerRef}
                 zoomLevel={zoomState.level}
                 panX={zoomState.panX}
                 panY={zoomState.panY}

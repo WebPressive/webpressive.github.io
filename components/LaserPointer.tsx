@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import { useSlideImageBounds } from '../utils/slideImageBounds';
 
 interface LaserPointerProps {
   isActive: boolean;
@@ -11,61 +12,8 @@ interface LaserPointerProps {
 }
 
 const LaserPointer: React.FC<LaserPointerProps> = ({ isActive, position, containerRef, zoomLevel = 1.0, panX = 0, panY = 0 }) => {
-  const [imageBounds, setImageBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
-
-  // Find the image element within the container and track its bounds
-  useEffect(() => {
-    let animationFrameId: number;
-
-    const updateBounds = () => {
-      const container = containerRef?.current || document.body;
-      const img = container.querySelector('img[class*="object-contain"]') as HTMLImageElement;
-      
-      if (img && img.naturalWidth && img.naturalHeight) {
-        imageRef.current = img;
-        const rect = img.getBoundingClientRect();
-        
-        // Calculate rendered content dimensions (accounting for object-fit: contain)
-        const naturalRatio = img.naturalWidth / img.naturalHeight;
-        const visibleRatio = rect.width / rect.height;
-        
-        let renderedWidth = rect.width;
-        let renderedHeight = rect.height;
-        let contentLeft = 0;
-        let contentTop = 0;
-        
-        if (visibleRatio > naturalRatio) {
-          // Wider than content -> height constrained
-          renderedWidth = rect.height * naturalRatio;
-          contentLeft = (rect.width - renderedWidth) / 2;
-        } else {
-          // Taller than content -> width constrained
-          renderedHeight = rect.width / naturalRatio;
-          contentTop = (rect.height - renderedHeight) / 2;
-        }
-
-        setImageBounds({
-          x: rect.left + contentLeft,
-          y: rect.top + contentTop,
-          width: renderedWidth,
-          height: renderedHeight,
-        });
-      }
-
-      if (isActive) {
-        animationFrameId = requestAnimationFrame(updateBounds);
-      }
-    };
-
-    updateBounds();
-
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [containerRef, zoomLevel, panX, panY, isActive]);
+  // Track the rendered slide image bounds (polled every frame while active)
+  const imageBounds = useSlideImageBounds(containerRef, isActive, [zoomLevel, panX, panY]);
 
   if (!isActive || !position || !imageBounds) return null;
 
@@ -108,4 +56,3 @@ const LaserPointer: React.FC<LaserPointerProps> = ({ isActive, position, contain
 };
 
 export default LaserPointer;
-
