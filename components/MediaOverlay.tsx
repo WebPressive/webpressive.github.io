@@ -43,6 +43,28 @@ const MediaItem: React.FC<MediaItemProps> = ({ item, url, bounds }) => {
   return <img src={url} style={style} alt="" draggable={false} onError={onError} />;
 };
 
+// Play badge of an animated still, redrawn above the playing GIF (the PDF draws the same badge, but the
+// GIF covers the quarter of it that lies inside the picture). Its centre sits on the media's bottom-left
+// corner, as in the Beamer decks (\animstill / \videostill): a 4.4 mm orange disc with a white triangle on a
+// 160 mm wide page. It takes no pointer input; the PDF's own link on the badge (LinkOverlay) handles the click.
+const BADGE_DIAMETER = 4.4 / 160; // fraction of the page width (Beamer 16:9 page)
+
+const PlayBadge: React.FC<{ item: PDFMedia; bounds: ImageBounds }> = ({ item, bounds }) => {
+  const d = BADGE_DIAMETER * bounds.width;
+  const cx = bounds.x + item.x * bounds.width;
+  const cy = bounds.y + (item.y + item.height) * bounds.height;
+  return (
+    <svg
+      viewBox="-2.2 -2.2 4.4 4.4"
+      style={{ position: 'absolute', left: cx - d / 2, top: cy - d / 2, width: d, height: d, overflow: 'visible' }}
+      aria-hidden="true"
+    >
+      <circle cx="0" cy="0" r="2.2" fill="#D64309" fillOpacity="0.9" />
+      <polygon points="-0.75,-1.15 -0.75,1.15 1.25,0" fill="#FFFFFF" />
+    </svg>
+  );
+};
+
 /**
  * Plays animated media over the slide image at the poster's exact position.
  * Follows object-fit: contain letterboxing and the zoom/pan transform through the slide image bounds.
@@ -72,7 +94,10 @@ const MediaOverlay: React.FC<MediaOverlayProps> = ({
     >
       {bounds &&
         items.map((item, index) => (
-          <MediaItem key={`${slideId}-${index}`} item={item} url={mediaMap[item.src]} bounds={bounds} />
+          <React.Fragment key={`${slideId}-${index}`}>
+            <MediaItem item={item} url={mediaMap[item.src]} bounds={bounds} />
+            <PlayBadge item={item} bounds={bounds} />
+          </React.Fragment>
         ))}
     </div>
   );

@@ -7,6 +7,7 @@ import LinkOverlay from './LinkOverlay';
 import AnnotationLayer from './AnnotationLayer';
 import MediaOverlay from './MediaOverlay';
 import { buildMediaMap, preloadMedia, revokeMediaMap } from '../utils/mediaUtils';
+import { createWheelStepper } from '../utils/wheelNavigation';
 import { clsx } from 'clsx';
 
 const ReceiverView: React.FC = () => {
@@ -22,11 +23,14 @@ const ReceiverView: React.FC = () => {
   const [annotationDraft, setAnnotationDraft] = useState<{ index: number; annotation: Annotation | null }>({ index: 0, annotation: null });
   const [mediaMap, setMediaMap] = useState<MediaMap>({});
   const [isMediaActive, setIsMediaActive] = useState(true);
+  const [isBlackScreen, setIsBlackScreen] = useState(false);
+  const channelRef = useRef<BroadcastChannel | null>(null); // For forwarding keys and wheel steps to the presenter
   const mediaMapRef = useRef<MediaMap>({}); // For revoking on replace/unmount
   const receiverContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const channel = new BroadcastChannel('webpressive_sync');
+    channelRef.current = channel;
 
     channel.onmessage = (event: MessageEvent<SyncMessage>) => {
       const msg = event.data;
@@ -73,6 +77,9 @@ const ReceiverView: React.FC = () => {
         if (msg.isMediaActive !== undefined) {
           setIsMediaActive(msg.isMediaActive);
         }
+        if (msg.isBlackScreen !== undefined) {
+          setIsBlackScreen(msg.isBlackScreen);
+        }
       } else if (msg.type === 'ANNOTATIONS_SYNC') {
         setAnnotations(msg.annotations);
       } else if (msg.type === 'ANNOTATION_DRAFT') {
@@ -92,7 +99,49 @@ const ReceiverView: React.FC = () => {
 
     return () => {
       channel.close();
+      channelRef.current = null;
       revokeMediaMap(mediaMapRef.current);
+    };
+  }, []);
+
+  // The projector window often has focus (it opened last, or was clicked to go fullscreen), so keys pressed
+  // here, by a clicker or the keyboard, are passed to the presenter window, which acts on them.
+  // F and F5 (a clicker's "start slideshow" button) toggle this window's own fullscreen instead: a browser
+  // only allows fullscreen from a real key press in the window itself.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'F11', 'F12'].includes(e.key)) return;
+      if ((e.key === 'f' || e.key === 'F' || e.key === 'F5') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+        else if (e.key !== 'F5') document.exitFullscreen().catch(() => {});
+        return;
+      }
+      // Leave browser shortcuts (Ctrl/Cmd + key) alone, except the annotation undo/redo the presenter handles
+      const isUndoRedo = (e.ctrlKey || e.metaKey) && ['z', 'Z', 'y', 'Y'].includes(e.key);
+      if ((e.ctrlKey || e.metaKey) && !isUndoRedo) return;
+      e.preventDefault();
+      channelRef.current?.postMessage({
+        type: 'KEY_FORWARD', key: e.key, code: e.code,
+        shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
+      } as SyncMessage);
+    };
+
+    // The plain wheel moves one slide per gesture, as in the presenter window
+    const stepper = createWheelStepper((direction) => {
+      channelRef.current?.postMessage({ type: 'WHEEL_STEP', direction } as SyncMessage);
+    });
+    const handleWheel = (e: WheelEvent) => {
+      if (e.shiftKey || e.ctrlKey) return;
+      e.preventDefault();
+      stepper(e);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('wheel', handleWheel);
     };
   }, []);
 
@@ -197,6 +246,8 @@ const ReceiverView: React.FC = () => {
         panX={zoomState.panX}
         panY={zoomState.panY}
       />
+      {/* Black screen (B or . on the presenter or a clicker) */}
+      {isBlackScreen && <div className="fixed inset-0 z-[70] bg-black" aria-label="Black screen" />}
     </div>
   );
 };

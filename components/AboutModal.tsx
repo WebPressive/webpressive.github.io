@@ -90,6 +90,10 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">Backspace</kbd>
                           <span>Previous slide</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">Mouse wheel</kbd>
+                          <span>Next / previous slide (one per scroll)</span>
+                        </div>
                       </div>
                     </div>
 
@@ -115,6 +119,14 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">F</kbd>
                           <span>Toggle fullscreen</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">F5</kbd>
+                          <span>Fullscreen (a clicker's start button)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">B or .</kbd>
+                          <span>Black screen on the projector; any navigation key returns</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">A</kbd>
@@ -269,6 +281,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                   <ol className="list-decimal list-inside space-y-2 text-neutral-300 text-sm">
                     <li>Upload a Beamer PDF or click "Start Demo" to load a sample presentation</li>
                     <li>Use arrow keys or space to navigate between slides</li>
+                    <li>A presentation clicker works out of the box (Page Up/Down, F5, B), in either window; the mouse wheel also changes slides</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">D</kbd> to toggle dual-screen mode for projector displays</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">Z</kbd> then click and drag to zoom into a specific region</li>
                     <li>When zoomed, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">H</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">J</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">K</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">U</kbd> to pan, or right-click and drag</li>

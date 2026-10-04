@@ -36,6 +36,7 @@ For release notes and more information, visit the [Releases page](https://github
   - Pan with right-click drag when zoomed
 - **Spotlight**: Dim the screen except for a highlighted area
 - **Laser Pointer**: Synchronized laser pointer across presenter and receiver screens
+- **Clickers & Mouse Wheel**: Presentation clickers work in either window (keys pressed in the receiver window are passed to the presenter); the mouse wheel changes slides
 - **Annotations**: Draw on slides with pen, highlighter, line, arrow, rectangle and ellipse tools, or click and type text notes
   - Color and stroke width palette, undo/redo, clear slide / clear all
   - Eraser removes just the part of a stroke under the cursor (shapes and text are removed whole)
@@ -121,6 +122,7 @@ The production build uses Nginx to serve the optimized static files.
 - **Arrow Left** / **Arrow Right**: Previous / Next slide
 - **Space** / **Page Down**: Next slide
 - **Page Up** / **Backspace**: Previous slide
+- **Mouse wheel**: Next / previous slide, one per scroll gesture (**Shift + wheel** zooms)
 
 ### Presentation Modes
 - **TAB**: Toggle overview mode (grid view of all slides)
@@ -128,6 +130,8 @@ The production build uses Nginx to serve the optimized static files.
 - **L**: Toggle laser pointer
 - **D**: Toggle dual-screen mode (receiver window)
 - **F**: Toggle fullscreen
+- **F5**: Fullscreen (a clicker's "start slideshow" button; the page is not reloaded)
+- **B** or **.**: Black screen on the projector; the next navigation key brings the slide back
 - **A**: Show about dialog (works in dual-screen mode)
 - **P**: Pause/Resume presentation timer
 - **M**: Toggle animations (GIFs/videos) on/off (see [Animated GIFs & Videos](#animated-gifs--videos))

@@ -15,6 +15,7 @@ import AnnotationLayer from './components/AnnotationLayer';
 import AnnotationToolbar from './components/AnnotationToolbar';
 import { renderPageAtZoom } from './utils/pdfUtils';
 import { buildMediaMap, preloadMedia, revokeMediaMap, resolveMediaFiles } from './utils/mediaUtils';
+import { createWheelStepper } from './utils/wheelNavigation';
 import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, ANNOTATION_HISTORY_LIMIT, ANNOTATION_STORAGE_KEY } from './constants';
 import { clsx } from 'clsx';
 
@@ -91,6 +92,10 @@ const App: React.FC = () => {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [mediaMap, setMediaMap] = useState<MediaMap>({});
   const [isMediaActive, setIsMediaActive] = useState(true);
+  // Projector blacked out (B or . , a clicker's "black screen" button); the next navigation key brings it back
+  const [isBlackScreen, setIsBlackScreen] = useState(false);
+  // Wheel steps from the receiver window go through the same checks as the presenter's own wheel
+  const wheelStepRef = useRef<(direction: 1 | -1) => void>(() => {});
   const [mediaNotice, setMediaNotice] = useState<{ text: string; duration: number } | null>(null);
   // Media paths of this deck with no file yet. A browser cannot read files next to an opened PDF,
   // so a banner offers to pick the deck's folder until these are found (or the banner is dismissed).
@@ -167,18 +172,25 @@ const App: React.FC = () => {
           isLaserActive: isLaserActive,
           laserPosition: laserPosition,
           zoomState: zoomState,
-          isMediaActive: isMediaActive
+          isMediaActive: isMediaActive,
+          isBlackScreen: isBlackScreen
         } as SyncMessage);
         channel.postMessage({ type: 'ANNOTATIONS_SYNC', annotations } as SyncMessage);
         if (mediaFiles.length > 0) {
           // Blobs are cloned across windows; the receiver makes its own object URLs
           channel.postMessage({ type: 'MEDIA_SYNC', files: mediaFiles } as SyncMessage);
         }
+      } else if (event.data.type === 'KEY_FORWARD') {
+        // A key pressed in the projector window (often a clicker): handle it as if pressed here
+        const { key, code, shiftKey, ctrlKey, altKey, metaKey } = event.data;
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, code, shiftKey, ctrlKey, altKey, metaKey, cancelable: true }));
+      } else if (event.data.type === 'WHEEL_STEP') {
+        wheelStepRef.current(event.data.direction);
       }
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState, annotations, mediaFiles, isMediaActive]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState, annotations, mediaFiles, isMediaActive, isBlackScreen]);
 
   // Broadcast committed annotations (infrequent: on every stroke commit, erase, undo, clear)
   useEffect(() => {
@@ -229,10 +241,11 @@ const App: React.FC = () => {
         isLaserActive: isLaserActive,
         laserPosition: laserPosition,
         zoomState: zoomState,
-        isMediaActive: isMediaActive
+        isMediaActive: isMediaActive,
+        isBlackScreen: isBlackScreen
       });
     }
-  }, [currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isReceiver, isLaserActive, laserPosition, zoomState, isMediaActive]);
+  }, [currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isReceiver, isLaserActive, laserPosition, zoomState, isMediaActive, isBlackScreen]);
 
   const toggleDualScreen = useCallback(() => {
     if (isDualScreen && receiverWindowRef.current) {
@@ -417,6 +430,7 @@ const App: React.FC = () => {
   }, [zoomedSlideSrc, slides, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition]);
 
   const nextSlide = useCallback(() => {
+    setIsBlackScreen(false);
     setCurrentSlideIndex((prev) => Math.min(prev + 1, slides.length - 1));
     resetZoom(); // Reset zoom when changing slides
     // Scroll speaker notes to top when in dual screen mode
@@ -426,6 +440,7 @@ const App: React.FC = () => {
   }, [slides.length, resetZoom, isDualScreen]);
 
   const prevSlide = useCallback(() => {
+    setIsBlackScreen(false);
     setCurrentSlideIndex((prev) => Math.max(prev - 1, 0));
     resetZoom(); // Reset zoom when changing slides
     // Scroll speaker notes to top when in dual screen mode
@@ -456,6 +471,7 @@ const App: React.FC = () => {
   }, [currentSlideIndex]);
 
   const selectSlide = (index: number) => {
+    setIsBlackScreen(false);
     setCurrentSlideIndex(index);
     setMode(AppMode.PRESENTATION);
     resetZoom(); // Reset zoom when changing slides
@@ -747,6 +763,19 @@ const App: React.FC = () => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
 
+      // After a control-bar button was clicked, Space/Enter (clicker or keyboard) must change slides, not press it again
+      if (target && target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) {
+        e.preventDefault();
+        target.blur();
+      }
+
+      // While the projector is blacked out, the next navigation key only brings the slide back
+      if (isBlackScreen && ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Enter', 'Backspace', 'Escape', 'b', 'B', '.'].includes(e.key)) {
+        e.preventDefault();
+        setIsBlackScreen(false);
+        return;
+      }
+
       // Annotation undo/redo (handled before the switch so Ctrl+Z doesn't trigger region zoom)
       if ((e.ctrlKey || e.metaKey) && mode === AppMode.PRESENTATION) {
         const key = e.key.toLowerCase();
@@ -866,9 +895,9 @@ const App: React.FC = () => {
         case 'f':
         case 'F':
           if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
+            document.documentElement.requestFullscreen?.().catch(() => {});
           } else {
-            document.exitFullscreen();
+            document.exitFullscreen().catch(() => {});
           }
           break;
         case '1':
@@ -917,6 +946,17 @@ const App: React.FC = () => {
           if (mode === AppMode.PRESENTATION || mode === AppMode.OVERVIEW) {
             setShowAbout(prev => !prev); // Toggle about modal
           }
+          break;
+        case 'b':
+        case 'B':
+        case '.':
+          // Black screen on the projector (a clicker's "black screen" button sends B or .)
+          if (mode === AppMode.PRESENTATION) setIsBlackScreen(true);
+          break;
+        case 'F5':
+          // A clicker's "start slideshow" button (F5 / Shift+F5): go fullscreen instead of reloading the page
+          e.preventDefault();
+          if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
           break;
         case 'm':
         case 'M':
@@ -1074,9 +1114,22 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia, isBlackScreen]);
 
-  // Mouse wheel zoom (Mode B) - Shift + Wheel
+  // Mouse wheel: Shift + wheel zooms (Mode B); the plain wheel moves one slide per scroll gesture.
+  // No slide change while zoomed, drawing, in the about dialog, or over the speaker notes (which scroll).
+  const wheelStep = (direction: 1 | -1) => {
+    if (mode !== AppMode.PRESENTATION || isRegionSelecting || isAnnotating || showAbout || zoomState.level > 1.0) return;
+    if (isBlackScreen) {
+      setIsBlackScreen(false);
+      return;
+    }
+    if (direction > 0) nextSlide(); else prevSlide();
+  };
+  wheelStepRef.current = wheelStep;
+  const wheelStepperRef = useRef<((e: WheelEvent) => void) | null>(null);
+  if (!wheelStepperRef.current) wheelStepperRef.current = createWheelStepper((direction) => wheelStepRef.current(direction));
+
   useEffect(() => {
     if (mode !== AppMode.PRESENTATION || isRegionSelecting) return;
 
@@ -1086,7 +1139,12 @@ const App: React.FC = () => {
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         const newZoom = Math.max(0.5, Math.min(3.0, zoomState.level + delta));
         applyZoom(newZoom, false);
+        return;
       }
+      if (e.ctrlKey) return; // Trackpad pinch: leave it to the browser
+      if (speakerNotesRef.current?.contains(e.target as Node)) return; // The notes panel scrolls itself
+      e.preventDefault();
+      wheelStepperRef.current?.(e);
     };
 
     window.addEventListener('wheel', handleWheel, { passive: false });
@@ -1512,6 +1570,13 @@ const App: React.FC = () => {
                  <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30 z-50">
                    LIVE ON PROJECTOR
                  </div>
+                 {isBlackScreen && (
+                   <div className="absolute inset-0 z-40 bg-black/75 flex items-center justify-center pointer-events-none">
+                     <span className="px-3 py-1 rounded-full border border-neutral-500 text-sm font-mono text-neutral-200">
+                       PROJECTOR BLACK: press any navigation key
+                     </span>
+                   </div>
+                 )}
                  {isRegionSelecting && (
                    <div className="absolute top-4 right-4 bg-blue-600/90 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium shadow-lg border border-blue-400/30 z-50">
                      <Search className="w-4 h-4" />
@@ -1803,6 +1868,9 @@ const App: React.FC = () => {
         onAboutClick={() => setShowAbout(true)}
       />
 
+      {isBlackScreen && (
+        <div className="absolute inset-0 z-[45] bg-black" onClick={() => setIsBlackScreen(false)} aria-label="Black screen" />
+      )}
       {annotationToolbar}
       {mediaNoticeBanner ?? missingMediaBanner}
 

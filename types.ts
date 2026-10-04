@@ -88,7 +88,10 @@ export type AnnotationMap = Record<number, Annotation[]>;
 export type SyncMessage =
   | { type: 'SYNC_REQUEST' }
   | { type: 'SYNC_INIT'; slides: SlideData[]; startTime: number | null }
-  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; spotlightPosition?: { x: number; y: number } | null; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState; isMediaActive?: boolean }
+  | { type: 'STATE_UPDATE'; index: number; isSpotlight: boolean; spotlightPosition?: { x: number; y: number } | null; mode: AppMode; isLaserActive?: boolean; laserPosition?: { x: number; y: number } | null; zoomState?: ZoomState; isMediaActive?: boolean; isBlackScreen?: boolean }
   | { type: 'ANNOTATIONS_SYNC'; annotations: AnnotationMap }
   | { type: 'ANNOTATION_DRAFT'; index: number; annotation: Annotation | null }
-  | { type: 'MEDIA_SYNC'; files: MediaFile[] };
+  | { type: 'MEDIA_SYNC'; files: MediaFile[] }
+  // Receiver -> presenter: a key pressed (e.g. by a clicker) or a wheel step taken in the projector window
+  | { type: 'KEY_FORWARD'; key: string; code: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }
+  | { type: 'WHEEL_STEP'; direction: 1 | -1 };
