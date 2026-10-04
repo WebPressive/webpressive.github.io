@@ -402,6 +402,10 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
               <span>Annotate</span>
             </div>
             <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">M</span>
+              <span>Animations</span>
+            </div>
+            <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">D</span>
               <span>Dual Screen</span>
             </div>
@@ -424,7 +428,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
           <div className="flex justify-center items-center gap-4 text-sm relative z-50">
             <span className="text-neutral-500">Standalone version:</span>
             <a
-              href="https://github.com/WebPressive/webpressive/releases/tag/v0.1.6"
+              href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.6"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 transition-colors font-semibold underline cursor-pointer relative z-50"

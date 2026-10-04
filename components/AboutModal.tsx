@@ -121,10 +121,6 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <span>Show this about dialog (works in dual-screen mode)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">M</kbd>
-                          <span>Animations (GIFs/videos) on/off</span>
-                        </div>
-                        <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">P</kbd>
                           <span>Pause/Resume timer</span>
                         </div>
@@ -161,6 +157,16 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">Ctrl + Shift + Z</kbd>
                           <span>Redo (also Ctrl + Y)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-400 mb-2">Animated GIFs &amp; Videos</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">M</kbd>
+                          <span>Turn animations on/off (on both screens)</span>
                         </div>
                       </div>
                     </div>
@@ -268,6 +274,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>When zoomed, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">H</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">J</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">K</kbd>, <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">U</kbd> to pan, or right-click and drag</li>
                     <li>Use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">S</kbd> for spotlight or <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">L</kbd> for laser pointer</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">N</kbd> to draw on the slide (pen, highlighter, shapes); annotations are mirrored to the projector and kept per slide</li>
+                    <li>GIFs and videos marked in the Beamer PDF play over their stills on both screens: open a PDF that carries its GIFs, or use "Open folder with animations" to load the PDF with its folder. Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">M</kbd> to turn them on/off</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">P</kbd> to pause/resume the presentation timer during preparation</li>
                     <li>In dual-screen mode, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">T</kbd> and <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd> to scroll speaker notes line-by-line</li>
                     <li>Click embedded links in the PDF to navigate or open external URLs</li>
@@ -285,6 +292,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>Multiple zoom modes: fixed levels, continuous, and region selection</li>
                     <li>Pan support when zoomed in</li>
                     <li>Spotlight and laser pointer tools</li>
+                    <li>Animated GIFs and videos on slides, played over their stills on both screens</li>
                     <li>Embedded PDF links are preserved and clickable</li>
                     <li>Resizable panels in presenter view</li>
                     <li>Real-time progress tracking during PDF loading</li>
@@ -303,7 +311,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <strong className="text-blue-400">Latest Release:</strong>
                       </p>
                       <a 
-                        href="https://github.com/WebPressive/webpressive/releases/tag/v0.1.6" 
+                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.6" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
@@ -319,7 +327,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Windows: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.6/WebPressive%20Setup%200.1.6.exe" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive.Setup.0.1.6.exe" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -330,7 +338,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Linux: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive/releases/download/v0.1.6/WebPressive-0.1.6.AppImage" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive-0.1.6.AppImage" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -342,7 +350,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     </div>
                     <div>
                       <a 
-                        href="https://github.com/WebPressive/webpressive/releases" 
+                        href="https://github.com/WebPressive/webpressive.github.io/releases" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm"
