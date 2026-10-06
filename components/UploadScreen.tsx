@@ -205,8 +205,11 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
         throw new Error('Demo PDF appears to be empty or could not be processed');
       }
       
+      // The demo deck carries its animations as attachments
+      const embedded = await getEmbeddedMediaFiles();
+      const { resolved, missing } = resolveMediaFiles(slides, embedded, file.name);
       setProcessingStatus(`Loaded ${slides.length} slides`);
-      onSlidesLoaded(slides);
+      onSlidesLoaded(slides, { files: resolved, missing });
     } catch (error) {
       console.error('Error loading demo PDF:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
