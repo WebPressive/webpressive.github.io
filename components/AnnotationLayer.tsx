@@ -22,7 +22,7 @@ interface AnnotationLayerProps {
   onEraseEnd?: () => void; // Fired when an eraser drag finishes, so the whole drag can be one undo step
 }
 
-type Px = [number, number];
+export type Px = [number, number];
 
 const MIN_POINT_DISTANCE_PX = 1.5; // Skip pointer samples closer than this to the previous point
 const ERASER_MIN_RADIUS_PX = 10;
@@ -66,7 +66,7 @@ const splitAroundCircle = (pts: Px[], center: Px, radius: number): [number, numb
 };
 
 // Smooth a freehand polyline with quadratic curves through segment midpoints
-const smoothPath = (pts: Px[]): string => {
+export const smoothPath = (pts: Px[]): string => {
   if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]} L ${pts[0][0]} ${pts[0][1]}`; // Dot (round caps)
   if (pts.length === 2) return `M ${pts[0][0]} ${pts[0][1]} L ${pts[1][0]} ${pts[1][1]}`;
   let d = `M ${pts[0][0]} ${pts[0][1]}`;
@@ -80,7 +80,7 @@ const smoothPath = (pts: Px[]): string => {
   return d;
 };
 
-const straightPath = (pts: Px[]): string =>
+export const straightPath = (pts: Px[]): string =>
   pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ') + (pts.length === 1 ? ` L ${pts[0][0]} ${pts[0][1]}` : '');
 
 // Pixel outline used for eraser hit-testing (rect and ellipse are approximated by their outline)

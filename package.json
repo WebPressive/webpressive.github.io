@@ -12,6 +12,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.24.10",
     "lucide-react": "^0.562.0",
+    "mediabunny": "1.59.1",
     "pdfjs-dist": "^4.0.379",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

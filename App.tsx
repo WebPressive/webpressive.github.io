@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Plus, Minus, Eye } from 'lucide-react';
-import { SlideData, AppMode, SyncMessage, ZoomState, Annotation, AnnotationMap, AnnotationTool, MediaFile, MediaMap } from './types';
+import { SlideData, AppMode, SyncMessage, ZoomState, Annotation, AnnotationMap, AnnotationTool, MediaFile, MediaMap, CameraSettings, AudienceState } from './types';
 import UploadScreen, { LoadedMedia } from './components/UploadScreen';
 import Controls from './components/Controls';
 import SpotlightLayer from './components/SpotlightLayer';
@@ -13,9 +13,17 @@ import ReceiverView from './components/ReceiverView';
 import AboutModal from './components/AboutModal';
 import AnnotationLayer from './components/AnnotationLayer';
 import AnnotationToolbar from './components/AnnotationToolbar';
+import CameraOverlay from './components/CameraOverlay';
+import CameraPanel from './components/CameraPanel';
+import RecordingPanel from './components/RecordingPanel';
+import RecordingIndicator from './components/RecordingIndicator';
+import PlaybackView from './components/PlaybackView';
 import { renderPageAtZoom } from './utils/pdfUtils';
 import { buildMediaMap, preloadMedia, revokeMediaMap, resolveMediaFiles } from './utils/mediaUtils';
 import { createWheelStepper } from './utils/wheelNavigation';
+import { loadCameraSettings, storeCameraSettings, useCameraStream } from './utils/camera';
+import { useTalkRecording } from './utils/useTalkRecording';
+import { useRecordingExport } from './utils/useRecordingExport';
 import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, ANNOTATION_HISTORY_LIMIT, ANNOTATION_STORAGE_KEY } from './constants';
 import { clsx } from 'clsx';
 
@@ -26,6 +34,8 @@ const getAnnotationStorageKey = (slides: SlideData[]): string | null => {
   const pdfName = slides[0].name.replace(/ - Slide \d+$/, '');
   return `${pdfName}|${slides.length}`;
 };
+
+const NO_ANNOTATIONS: Annotation[] = []; // Stable empty list, so "no ink" is not a change on every render
 
 const loadStoredAnnotations = (key: string): AnnotationMap => {
   try {
@@ -103,6 +113,18 @@ const App: React.FC = () => {
   const [isMissingMediaDismissed, setIsMissingMediaDismissed] = useState(false);
   const mediaFolderInputRef = useRef<HTMLInputElement>(null);
 
+  // Presenter camera on the slides (V). The settings persist; the camera always starts off.
+  // The device is open while the camera is shown or its settings panel is open, and released otherwise.
+  const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isCameraPanelOpen, setIsCameraPanelOpen] = useState(false);
+  const [cameraAttempt, setCameraAttempt] = useState(0); // Bumped to retry after a failure
+
+  // Talk recording: its panel, and the recording being played back (covers the presenter window)
+  const [isRecordingPanelOpen, setIsRecordingPanelOpen] = useState(false);
+  const [playback, setPlayback] = useState<{ recordingId: string; clip: number } | null>(null);
+  const camera = useCameraStream(!isReceiver && (isCameraOn || isCameraPanelOpen), cameraSettings.videoDeviceId, cameraAttempt);
+
   // Dual Screen State
   const [isDualScreen, setIsDualScreen] = useState(false);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
@@ -146,6 +168,16 @@ const App: React.FC = () => {
   const [zoomedSlideSrc, setZoomedSlideSrc] = useState<string | null>(null);
   const zoomedSlideRef = useRef<string | null>(null); // Track which slide is currently zoomed
 
+  // --- Camera sync ---
+  // `active` only once the stream is live, so the projector window can borrow it at once
+  const cameraSyncMessage = (): SyncMessage => ({
+    type: 'CAMERA_SYNC',
+    active: isCameraOn && !!camera.stream,
+    settings: cameraSettings,
+    streamId: camera.stream?.id,
+    deviceId: camera.stream?.getVideoTracks()[0]?.getSettings().deviceId,
+  });
+
   // --- Dual Screen / Broadcasting Logic ---
   useEffect(() => {
     if (isReceiver) return; // Receivers don't broadcast
@@ -176,6 +208,7 @@ const App: React.FC = () => {
           isBlackScreen: isBlackScreen
         } as SyncMessage);
         channel.postMessage({ type: 'ANNOTATIONS_SYNC', annotations } as SyncMessage);
+        channel.postMessage(cameraSyncMessage());
         if (mediaFiles.length > 0) {
           // Blobs are cloned across windows; the receiver makes its own object URLs
           channel.postMessage({ type: 'MEDIA_SYNC', files: mediaFiles } as SyncMessage);
@@ -190,7 +223,7 @@ const App: React.FC = () => {
     };
 
     return () => channel.close();
-  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState, annotations, mediaFiles, isMediaActive, isBlackScreen]);
+  }, [isReceiver, slides, startTime, currentSlideIndex, isSpotlightActive, spotlightPosition, mode, isLaserActive, laserPosition, zoomState, annotations, mediaFiles, isMediaActive, isBlackScreen, isCameraOn, camera.stream, cameraSettings]);
 
   // Broadcast committed annotations (infrequent: on every stroke commit, erase, undo, clear)
   useEffect(() => {
@@ -210,6 +243,30 @@ const App: React.FC = () => {
     }
   }, [annotationDraft, currentSlideIndex, mode, isReceiver]);
 
+  // Camera: broadcast every change, keep the settings, share the stream with the projector window
+  useEffect(() => {
+    if (!isReceiver && broadcastChannelRef.current && mode !== AppMode.UPLOAD) {
+      broadcastChannelRef.current.postMessage(cameraSyncMessage());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCameraOn, camera.stream, cameraSettings, mode, isReceiver]);
+
+  useEffect(() => {
+    if (!isReceiver) storeCameraSettings(cameraSettings);
+  }, [cameraSettings, isReceiver]);
+
+  useEffect(() => {
+    if (!isReceiver) window.webpressiveCameraStream = camera.stream;
+  }, [camera.stream, isReceiver]);
+
+  // A camera that fails or stops is switched off; the panel shows why, or a notice does when it is closed
+  useEffect(() => {
+    if (!camera.error) return;
+    setIsCameraOn(false);
+    if (!isCameraPanelOpen) setMediaNotice({ text: camera.error, duration: 8000 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera.error]);
+
   // Load persisted annotations when a presentation starts; save on every change
   const annotationStorageKey = getAnnotationStorageKey(slides);
   useEffect(() => {
@@ -228,6 +285,44 @@ const App: React.FC = () => {
       storeAnnotations(annotationStorageKey, annotations);
     }
   }, [annotations, annotationStorageKey]);
+
+  // --- Talk recording ---
+  // The recorder sees what the audience sees: the same state the projector window gets, the ink on the
+  // current slide, and the camera (its picture only while shown on the slides)
+  const audienceState = useMemo<AudienceState>(
+    () => ({
+      index: currentSlideIndex,
+      mode,
+      isSpotlight: isSpotlightActive,
+      spotlightPosition,
+      isLaser: isLaserActive,
+      laserPosition,
+      zoomState,
+      isMediaActive,
+      isBlackScreen,
+    }),
+    [currentSlideIndex, mode, isSpotlightActive, spotlightPosition, isLaserActive, laserPosition, zoomState, isMediaActive, isBlackScreen]
+  );
+  const slideAnnotations = annotations[currentSlideIndex] ?? NO_ANNOTATIONS;
+  const recorderInput = useMemo(
+    () => ({ state: audienceState, annotations: slideAnnotations, draft: annotationDraft, camera: cameraSettings }),
+    [audienceState, slideAnnotations, annotationDraft, cameraSettings]
+  );
+  const recordedVideoTrack = useMemo(
+    () => (isCameraOn && camera.stream ? camera.stream.getVideoTracks()[0] ?? null : null),
+    [isCameraOn, camera.stream]
+  );
+  const deckName = slides[0]?.name.replace(/ - Slide \d+$/, '') ?? '';
+  const recording = useTalkRecording({
+    enabled: !isReceiver && slides.length > 0,
+    deckKey: annotationStorageKey,
+    deckName,
+    input: recorderInput,
+    videoTrack: recordedVideoTrack,
+    micDeviceId: cameraSettings.audioDeviceId,
+    onNotice: (text: string) => setMediaNotice({ text, duration: 8000 }),
+  });
+  const recordingExport = useRecordingExport(slides, mediaMap, deckName, (text: string) => setMediaNotice({ text, duration: 8000 }));
 
   // Broadcast state changes
   useEffect(() => {
@@ -485,6 +580,34 @@ const App: React.FC = () => {
     setIsMediaActive(!isMediaActive);
     setMediaNotice({ text: isMediaActive ? 'Animations off' : 'Animations on', duration: 1500 });
   }, [isMediaActive]);
+
+  const toggleCamera = useCallback(() => {
+    if (!isCameraOn && camera.error) setCameraAttempt((n: number) => n + 1); // Try again after a failure
+    setIsCameraOn(!isCameraOn);
+  }, [isCameraOn, camera.error]);
+
+  // The camera and recording panels share the same spot: one at a time
+  const toggleCameraPanel = useCallback(() => {
+    if (!isCameraPanelOpen && camera.error) setCameraAttempt((n: number) => n + 1);
+    setIsCameraPanelOpen(!isCameraPanelOpen);
+    setIsRecordingPanelOpen(false);
+  }, [isCameraPanelOpen, camera.error]);
+
+  const openCameraPanel = useCallback(() => {
+    if (isCameraPanelOpen) return;
+    if (camera.error) setCameraAttempt((n: number) => n + 1);
+    setIsCameraPanelOpen(true);
+    setIsRecordingPanelOpen(false);
+  }, [isCameraPanelOpen, camera.error]);
+
+  const toggleRecordingPanel = useCallback(() => {
+    setIsRecordingPanelOpen(!isRecordingPanelOpen);
+    setIsCameraPanelOpen(false);
+  }, [isRecordingPanelOpen]);
+
+  const updateCameraSettings = useCallback((changes: Partial<CameraSettings>) => {
+    setCameraSettings((prev: CameraSettings) => ({ ...prev, ...changes }));
+  }, []);
 
   // Adds media files picked after the deck was loaded (the deck's folder), matched by path suffix
   const addMediaFiles = (fileList: FileList | null) => {
@@ -758,10 +881,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (mode === AppMode.UPLOAD) return;
+      if (playback) return; // The player handles its own keys
 
       // Typing into a text annotation must not trigger single-letter shortcuts
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.isContentEditable)) return;
 
       // After a control-bar button was clicked, Space/Enter (clicker or keyboard) must change slides, not press it again
       if (target && target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) {
@@ -958,6 +1082,11 @@ const App: React.FC = () => {
           e.preventDefault();
           if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
           break;
+        case 'v':
+        case 'V':
+          // Presenter camera on the slides on/off
+          if (mode === AppMode.PRESENTATION) toggleCamera();
+          break;
         case 'm':
         case 'M':
           // Animations (GIF/video over poster stills) on/off
@@ -965,7 +1094,13 @@ const App: React.FC = () => {
           break;
         case 'p':
         case 'P':
-          if (mode === AppMode.PRESENTATION && startTime) {
+          if (mode !== AppMode.PRESENTATION) break;
+          if (recording.isActive) {
+            // While recording, P pauses/resumes the recording, and the timer with it
+            const pausing = recording.status === 'recording';
+            recording.togglePause();
+            if (startTime && pausing !== isPaused) togglePause();
+          } else if (startTime) {
             togglePause();
           }
           break;
@@ -1094,8 +1229,14 @@ const App: React.FC = () => {
           }
           break;
         case 'Escape':
-          if (showAbout) {
+          if (recording.status === 'countdown') {
+            recording.cancelCountdown();
+          } else if (showAbout) {
             setShowAbout(false);
+          } else if (isCameraPanelOpen) {
+            setIsCameraPanelOpen(false);
+          } else if (isRecordingPanelOpen) {
+            setIsRecordingPanelOpen(false);
           } else if (mode === AppMode.OVERVIEW) {
             setMode(AppMode.PRESENTATION);
           } else if (isAnnotating) {
@@ -1114,12 +1255,12 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia, isBlackScreen]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia, isBlackScreen, toggleCamera, isCameraPanelOpen, isRecordingPanelOpen, recording, isPaused, playback]);
 
   // Mouse wheel: Shift + wheel zooms (Mode B); the plain wheel moves one slide per scroll gesture.
   // No slide change while zoomed, drawing, in the about dialog, or over the speaker notes (which scroll).
   const wheelStep = (direction: 1 | -1) => {
-    if (mode !== AppMode.PRESENTATION || isRegionSelecting || isAnnotating || showAbout || zoomState.level > 1.0) return;
+    if (mode !== AppMode.PRESENTATION || isRegionSelecting || isAnnotating || showAbout || playback || zoomState.level > 1.0) return;
     if (isBlackScreen) {
       setIsBlackScreen(false);
       return;
@@ -1131,7 +1272,7 @@ const App: React.FC = () => {
   if (!wheelStepperRef.current) wheelStepperRef.current = createWheelStepper((direction) => wheelStepRef.current(direction));
 
   useEffect(() => {
-    if (mode !== AppMode.PRESENTATION || isRegionSelecting) return;
+    if (mode !== AppMode.PRESENTATION || isRegionSelecting || playback) return;
 
     const handleWheel = (e: WheelEvent) => {
       if (e.shiftKey) {
@@ -1149,7 +1290,7 @@ const App: React.FC = () => {
 
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, [mode, zoomState.level, applyZoom, isRegionSelecting]);
+  }, [mode, zoomState.level, applyZoom, isRegionSelecting, playback]);
 
   // Right-click drag panning
   useEffect(() => {
@@ -1470,6 +1611,76 @@ const App: React.FC = () => {
     />
   );
 
+  // The presenter's camera on the current slide; draggable while no pointer tool is active
+  const canMoveCamera = !isAnnotating && !isLaserActive && !isSpotlightActive && !isRegionSelecting;
+  const renderCameraOverlay = (containerRef: React.RefObject<HTMLDivElement>) => (
+    <CameraOverlay
+      stream={isCameraOn && mode === AppMode.PRESENTATION ? camera.stream : null}
+      settings={cameraSettings}
+      slideCamera={slides[currentSlideIndex]?.camera}
+      containerRef={containerRef}
+      slideId={slides[currentSlideIndex]?.id ?? ''}
+      onMove={canMoveCamera ? (position) => updateCameraSettings({ position }) : undefined}
+      onOpenSettings={openCameraPanel}
+    />
+  );
+
+  const cameraPanel = (
+    <CameraPanel
+      isOpen={isCameraPanelOpen}
+      onClose={() => setIsCameraPanelOpen(false)}
+      settings={cameraSettings}
+      onChange={updateCameraSettings}
+      isCameraOn={isCameraOn}
+      onToggleCamera={toggleCamera}
+      stream={camera.stream}
+      error={camera.error}
+      slideCamera={slides[currentSlideIndex]?.camera}
+    />
+  );
+
+  const recordingPanel = (
+    <RecordingPanel
+      isOpen={isRecordingPanelOpen}
+      onClose={() => setIsRecordingPanelOpen(false)}
+      recording={recording}
+      exporter={recordingExport}
+      currentSlide={currentSlideIndex}
+      isCameraOn={isCameraOn}
+      onRecord={() => {
+        setIsRecordingPanelOpen(false);
+        recording.start();
+      }}
+      onRerecordSlide={(slideIndex: number) => {
+        setIsRecordingPanelOpen(false);
+        selectSlide(slideIndex);
+        recording.start({ replaceSlide: slideIndex });
+      }}
+      onPlay={(recordingId: string, clip?: number) => {
+        if (recording.status !== 'idle') return;
+        setIsRecordingPanelOpen(false);
+        setPlayback({ recordingId, clip: clip ?? 0 });
+      }}
+    />
+  );
+
+  const recordingOverlays = (
+    <>
+      <RecordingIndicator recording={recording} />
+      {playback && (
+        <PlaybackView
+          key={`${playback.recordingId}:${playback.clip}`}
+          recordingId={playback.recordingId}
+          startClip={playback.clip}
+          slides={slides}
+          mediaMap={mediaMap}
+          exporter={recordingExport}
+          onClose={() => setPlayback(null)}
+        />
+      )}
+    </>
+  );
+
   const missingMediaBanner = missingMedia.length > 0 && !isMissingMediaDismissed ? (
     <div
       role="alert"
@@ -1566,6 +1777,7 @@ const App: React.FC = () => {
                    }}
                  />
                  {renderMediaOverlay(presenterSlideRef)}
+                 {renderCameraOverlay(presenterSlideRef)}
                  {/* Overlays inside the aspect-ratio container */}
                  <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-red-400 border border-red-500/30 z-50">
                    LIVE ON PROJECTOR
@@ -1762,6 +1974,10 @@ const App: React.FC = () => {
                 toggleLaser={toggleLaser}
                 isAnnotating={isAnnotating}
                 toggleAnnotate={toggleAnnotate}
+                isCameraOn={isCameraOn}
+                onCameraClick={toggleCameraPanel}
+                isRecording={recording.isActive}
+                onRecordClick={toggleRecordingPanel}
                 toggleDualScreen={toggleDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
@@ -1770,6 +1986,9 @@ const App: React.FC = () => {
         </div>
 
         {annotationToolbar}
+        {cameraPanel}
+        {recordingPanel}
+        {recordingOverlays}
         {mediaNoticeBanner ?? missingMediaBanner}
 
         {/* About Modal - also available in dual-screen mode */}
@@ -1844,6 +2063,8 @@ const App: React.FC = () => {
           />
         </motion.div>
       </AnimatePresence>
+      {/* Outside the per-slide fade, so the camera stays steady through slide changes */}
+      {renderCameraOverlay(normalViewRef)}
 
       <Controls
         currentSlide={currentSlideIndex}
@@ -1862,6 +2083,10 @@ const App: React.FC = () => {
         toggleLaser={toggleLaser}
         isAnnotating={isAnnotating}
         toggleAnnotate={toggleAnnotate}
+        isCameraOn={isCameraOn}
+        onCameraClick={toggleCameraPanel}
+        isRecording={recording.isActive}
+        onRecordClick={toggleRecordingPanel}
         toggleDualScreen={toggleDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}
@@ -1872,6 +2097,9 @@ const App: React.FC = () => {
         <div className="absolute inset-0 z-[45] bg-black" onClick={() => setIsBlackScreen(false)} aria-label="Black screen" />
       )}
       {annotationToolbar}
+      {cameraPanel}
+      {recordingPanel}
+      {recordingOverlays}
       {mediaNoticeBanner ?? missingMediaBanner}
 
       {/* Overview Mode */}

@@ -8,17 +8,17 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 ## 📦 Downloads
 
-**Latest Release: [v0.1.6](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.6)** (October 2026)
+**Latest Release: [v0.1.7](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.7)** (October 2026)
 
 Download the desktop application for your platform:
 
-- **Windows**: [WebPressive Setup 0.1.6.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive.Setup.0.1.6.exe) (102 MB)
-- **Linux**: [WebPressive-0.1.6.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive-0.1.6.AppImage) (141 MB)
+- **Windows**: [WebPressive Setup 0.1.7.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive.Setup.0.1.7.exe) (105 MB)
+- **Linux**: [WebPressive-0.1.7.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive-0.1.7.AppImage) (144 MB)
 
 ### Installation
 
 - **Windows**: Run the installer and follow the setup wizard
-- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.6.AppImage`) and run it
+- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.7.AppImage`) and run it
 
 For release notes and more information, visit the [Releases page](https://github.com/WebPressive/webpressive.github.io/releases).
 
@@ -29,6 +29,8 @@ For release notes and more information, visit the [Releases page](https://github
 - **Speaker Notes**: Automatically extracts and displays speaker notes from Beamer PDFs
 - **Embedded Links**: Clickable links from PDFs are preserved and functional
 - **Animated GIFs & Videos**: Play GIF, MP4 or WebM files over their poster stills, marked in Beamer with a `wpmedia:` link
+- **Presenter Camera**: Show your webcam on the slides, on both screens (circle, rounded or rectangle; any corner, size, or dragged into place; per-slide placement from Beamer with a `wpcamera:` link)
+- **Talk Recording**: Record your talk (voice, slides, ink, laser, zoom and camera), re-record single slides, play it back, and download it as a video or audio only
 - **Zoom & Pan**: Multiple zoom modes with smooth panning
   - Fixed zoom levels (50%, 100%, 150%, 200%)
   - Continuous zoom with mouse wheel
@@ -129,11 +131,12 @@ The production build uses Nginx to serve the optimized static files.
 - **S**: Toggle spotlight mode
 - **L**: Toggle laser pointer
 - **D**: Toggle dual-screen mode (receiver window)
+- **V**: Show/hide your camera on the slides (see [Presenter Camera](#presenter-camera))
 - **F**: Toggle fullscreen
 - **F5**: Fullscreen (a clicker's "start slideshow" button; the page is not reloaded)
 - **B** or **.**: Black screen on the projector; the next navigation key brings the slide back
 - **A**: Show about dialog (works in dual-screen mode)
-- **P**: Pause/Resume presentation timer
+- **P**: Pause/Resume presentation timer (and the recording, while recording)
 - **M**: Toggle animations (GIFs/videos) on/off (see [Animated GIFs & Videos](#animated-gifs--videos))
 - **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
 
@@ -147,7 +150,7 @@ The production build uses Nginx to serve the optimized static files.
 > **Note:** Speaker notes automatically scroll to the top when navigating to a new slide in dual-screen mode. The reading guide helps you track your position while reading long notes.
 
 ### Timer Controls
-- **P**: Pause/Resume presentation timer
+- **P**: Pause/Resume presentation timer (and the recording, while recording)
 - **Click clock**: Reset timer to 00:00
 
 ### Zoom Controls
@@ -266,6 +269,51 @@ Picked files are matched to a link's path in this order: the exact path, the pat
 - Thumbnails, the overview and the next-slide preview show the still.
 - `M` turns animations off and on (also on the receiver).
 - A missing or unreadable file leaves its still in place.
+
+### Presenter Camera
+Your webcam can appear on the slides, as with PowerPoint's Cameo: in the main view, and in the receiver window in dual-screen mode.
+
+- **V** shows or hides it. The camera is off when WebPressive starts, and the device is released whenever the camera is hidden and its settings are closed.
+- The **camera button** in the control bar opens its settings: the camera to use (with a preview), shape (circle, rounded, rectangle), corner, size, mirror and border, plus the microphone with a level meter (used by [recordings](#talk-recording)). These settings are remembered. Double-click the camera on a slide to open them; drag the panel's title bar to move it.
+- **Drag** the camera on your slide to put it anywhere; pick a corner to snap it back.
+- It stays in place while you zoom and pan. Ink, laser, spotlight and the black screen stay above it.
+- The camera picture stays on your computer and is never uploaded. In a browser it needs a secure page (https:// or localhost) and your permission.
+
+#### Place it per slide from Beamer
+A link whose URI is `wpcamera:` marks where the camera goes on that slide; `wpcamera:off` hides it on that slide. Slides without either use the camera settings.
+
+```latex
+\hypersetup{pdflinkmargin=0pt}% the link box must match the reserved box
+% \wpcamera{width}{height}: an invisible box where WebPressive shows the camera
+\newcommand\wpcamera[2]{\mbox{\href{wpcamera:}{\phantom{\rule{#1}{#2}}}}}
+% \wpcameraoff: no camera on this slide
+\newcommand\wpcameraoff{\mbox{\href{wpcamera:off}{\phantom{\rule{1pt}{1pt}}}}}
+
+% On a slide
+\begin{columns}
+  \column{.5\textwidth} Text…
+  \column{.5\textwidth} \wpcamera{5cm}{4cm}
+\end{columns}
+```
+
+With the circle shape the camera takes the largest circle that fits the box. Other PDF viewers show nothing there.
+
+### Talk Recording
+Record a talk the way PowerPoint's *Record Slide Show* does, then play it back or download it.
+
+1. Click the **record button** (red circle) in the control bar and choose **Record**. After a 3-second countdown (it can be turned off) recording starts on the current slide.
+2. Present as usual. Your voice, the slides, ink, laser, spotlight, zoom, black screen and your camera (while shown, **V**) are recorded. Without the camera, only your voice is recorded with the slides.
+3. The **REC** badge at the bottom left (presenter screen only) shows the time and the microphone level, and has mute, pause and stop. **P** pauses and resumes.
+
+Each slide visit is saved as its own clip. In the recording panel, the selected recording lists its slides: play from a slide, **re-record** one slide (recording stops when you leave it, and the new take replaces the old one), or clear it. **Record** adds to the selected recording; **New recording** starts another one.
+
+**Play** shows the recording full-window with the camera and sound: Space plays/pauses, ←/→ jump between clips, the bar seeks, and the speed goes up to 2×.
+
+**Download:** tick recordings in the panel and press **Download**, or use the download button in the player.
+- **Video**: everything the audience saw, with your camera and voice, at 1080p or 720p. It is an MP4 (H.264) where the browser can encode it (Chrome and Edge on Windows and macOS, the desktop app), otherwise a WebM. Creating the file takes a while for a long talk; keep the window open.
+- **Audio only**: your voice as M4A, or Ogg where M4A is not available.
+
+Recordings are stored in this browser on this computer (IndexedDB) and never uploaded. Clearing the site's data in the browser deletes them, so download the ones you want to keep.
 
 ### Progress Indicator
 When loading a PDF, a progress bar shows the current processing status with page-by-page feedback.

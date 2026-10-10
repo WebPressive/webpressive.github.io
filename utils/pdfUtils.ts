@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { SlideData, PDFLink, PDFMedia } from '../types';
+import { SlideData, PDFLink, PDFMedia, SlideCamera } from '../types';
 import { getMediaSource, InputFile, isMediaFileName, MEDIA_SCHEME, normalizeMediaPath } from './mediaUtils';
+import { getCameraMarker } from './camera';
 
 // Configure PDF.js worker for Vite
 // Use CDN for reliability (Vite can have issues with worker imports)
@@ -14,6 +15,7 @@ export interface PDFPageData {
   notes?: string; // Extracted speaker notes
   links?: PDFLink[]; // Embedded links
   media?: PDFMedia[]; // Animated media regions
+  camera?: SlideCamera; // Camera placement (wpcamera: link)
 }
 
 // Store for notes loaded from PDF metadata
@@ -33,11 +35,12 @@ let pdfCache: PDFCache | null = null;
  * @param page - The PDF page object
  * @param pdf - The PDF document (for resolving internal destinations)
  * @returns Promise resolving to the page's clickable links and, separately, its media regions
- *          (wpmedia: links, which are not navigation and must not be clickable)
+ *          (wpmedia: links) and camera placement (wpcamera: link), which are not navigation and must not be clickable
  */
-async function extractLinksFromPage(page: any, pdf: any): Promise<{ links: PDFLink[]; media: PDFMedia[] }> {
+async function extractLinksFromPage(page: any, pdf: any): Promise<{ links: PDFLink[]; media: PDFMedia[]; camera?: SlideCamera }> {
   const links: PDFLink[] = [];
   const media: PDFMedia[] = [];
+  let camera: SlideCamera | undefined;
   
   try {
     const annotations = await page.getAnnotations();
@@ -78,9 +81,17 @@ async function extractLinksFromPage(page: any, pdf: any): Promise<{ links: PDFLi
 
       // Media links: pdf.js sets `url` only for valid absolute URLs, so a wpmedia: or relative
       // URI usually arrives in `unsafeUrl` (or in `action.uri` for some hyperref output)
-      const mediaSource = getMediaSource(annotation.unsafeUrl ?? annotation.url ?? annotation.action?.uri);
+      const rawUri = annotation.unsafeUrl ?? annotation.url ?? annotation.action?.uri;
+      const mediaSource = getMediaSource(rawUri);
       if (mediaSource) {
         media.push({ x, y, width, height, ...mediaSource });
+        continue;
+      }
+
+      // Camera placement: the first wpcamera: link of the page wins
+      const cameraMarker = getCameraMarker(rawUri);
+      if (cameraMarker) {
+        if (!camera) camera = cameraMarker === 'hide' ? { x, y, width, height, hidden: true } : { x, y, width, height };
         continue;
       }
       
@@ -158,7 +169,7 @@ async function extractLinksFromPage(page: any, pdf: any): Promise<{ links: PDFLi
     console.debug('Failed to extract links from page:', e);
   }
   
-  return { links, media };
+  return { links, media, camera };
 }
 
 /**
@@ -440,7 +451,7 @@ export async function extractPagesFromPDF(
     const imageData = canvas.toDataURL('image/png');
     
     // Extract embedded links from the page
-    const { links, media } = await extractLinksFromPage(page, pdf);
+    const { links, media, camera } = await extractLinksFromPage(page, pdf);
     if (links.length > 0) {
       console.log(`Page ${pageNum}: Found ${links.length} embedded links`);
     }
@@ -456,6 +467,7 @@ export async function extractPagesFromPDF(
       notes,
       links,
       media,
+      camera,
     });
 
     // Report progress after each page is processed
@@ -495,6 +507,8 @@ export async function pdfToSlides(
     links: page.links,
     // Store animated media regions
     media: page.media,
+    // Store the camera placement
+    camera: page.camera,
   }));
 }
 

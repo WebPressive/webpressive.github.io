@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play, Video, Circle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -20,6 +20,10 @@ interface ControlsProps {
   toggleLaser?: () => void;
   isAnnotating?: boolean;
   toggleAnnotate?: () => void;
+  isCameraOn?: boolean;
+  onCameraClick?: () => void; // Opens the camera settings
+  isRecording?: boolean;
+  onRecordClick?: () => void; // Opens the recording panel
   toggleDualScreen?: () => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -44,6 +48,10 @@ const Controls: React.FC<ControlsProps> = ({
   toggleLaser,
   isAnnotating = false,
   toggleAnnotate,
+  isCameraOn = false,
+  onCameraClick,
+  isRecording = false,
+  onRecordClick,
   toggleDualScreen,
   nextSlide,
   prevSlide,
@@ -171,6 +179,28 @@ const Controls: React.FC<ControlsProps> = ({
             title="Annotate (N)"
           >
             <PenLine className="w-5 h-5" />
+          </button>
+        )}
+
+        {onCameraClick && (
+          <button
+            onClick={onCameraClick}
+            className={clsx("p-2 rounded-xl transition-colors", isCameraOn ? "bg-blue-600 text-white" : "hover:bg-white/10")}
+            title="Camera (V shows/hides it)"
+            aria-label="Camera settings"
+          >
+            <Video className="w-5 h-5" />
+          </button>
+        )}
+
+        {onRecordClick && (
+          <button
+            onClick={onRecordClick}
+            className={clsx("p-2 rounded-xl transition-colors", isRecording ? "bg-red-600 text-white" : "hover:bg-white/10")}
+            title="Record the talk"
+            aria-label="Recording"
+          >
+            <Circle className={clsx("w-5 h-5", isRecording ? "fill-current animate-pulse" : "text-red-500")} />
           </button>
         )}
 

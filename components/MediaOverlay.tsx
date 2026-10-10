@@ -45,9 +45,9 @@ const MediaItem: React.FC<MediaItemProps> = ({ item, url, bounds }) => {
 
 // Play badge of an animated still, redrawn above the playing GIF (the PDF draws the same badge, but the
 // GIF covers the quarter of it that lies inside the picture). Its centre sits on the media's bottom-left
-// corner, as in the Beamer decks (\animstill / \videostill): a 4.4 mm orange disc with a white triangle on a
+// corner, as in the Beamer decks (\animstill / \videostill): a 2.2 mm orange disc with a white triangle on a
 // 160 mm wide page. It takes no pointer input; the PDF's own link on the badge (LinkOverlay) handles the click.
-const BADGE_DIAMETER = 4.4 / 160; // fraction of the page width (Beamer 16:9 page)
+const BADGE_DIAMETER = 2.2 / 160; // fraction of the page width (Beamer 16:9 page); halved 2026-10-10 so adjacent GIFs are not covered
 
 const PlayBadge: React.FC<{ item: PDFMedia; bounds: ImageBounds }> = ({ item, bounds }) => {
   const d = BADGE_DIAMETER * bounds.width;

@@ -1,14 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { SlideData, SyncMessage, AppMode, ZoomState, Annotation, AnnotationMap, MediaMap } from '../types';
-import SpotlightLayer from './SpotlightLayer';
-import LaserPointer from './LaserPointer';
-import LinkOverlay from './LinkOverlay';
-import AnnotationLayer from './AnnotationLayer';
-import MediaOverlay from './MediaOverlay';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { SlideData, SyncMessage, AppMode, ZoomState, Annotation, AnnotationMap, MediaMap, AudienceState } from '../types';
+import AudienceView from './AudienceView';
 import { buildMediaMap, preloadMedia, revokeMediaMap } from '../utils/mediaUtils';
 import { createWheelStepper } from '../utils/wheelNavigation';
-import { clsx } from 'clsx';
+import { DEFAULT_CAMERA_SETTINGS, getOpenerCameraStream, useCameraStream } from '../utils/camera';
 
 const ReceiverView: React.FC = () => {
   const [slides, setSlides] = useState<SlideData[]>([]);
@@ -24,9 +19,9 @@ const ReceiverView: React.FC = () => {
   const [mediaMap, setMediaMap] = useState<MediaMap>({});
   const [isMediaActive, setIsMediaActive] = useState(true);
   const [isBlackScreen, setIsBlackScreen] = useState(false);
+  const [cameraSync, setCameraSync] = useState<Extract<SyncMessage, { type: 'CAMERA_SYNC' }> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null); // For forwarding keys and wheel steps to the presenter
   const mediaMapRef = useRef<MediaMap>({}); // For revoking on replace/unmount
-  const receiverContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const channel = new BroadcastChannel('webpressive_sync');
@@ -84,6 +79,8 @@ const ReceiverView: React.FC = () => {
         setAnnotations(msg.annotations);
       } else if (msg.type === 'ANNOTATION_DRAFT') {
         setAnnotationDraft({ index: msg.index, annotation: msg.annotation });
+      } else if (msg.type === 'CAMERA_SYNC') {
+        setCameraSync(msg);
       } else if (msg.type === 'MEDIA_SYNC') {
         // Object URLs from the presenter window are not usable here; make our own from the Blobs
         revokeMediaMap(mediaMapRef.current);
@@ -145,6 +142,16 @@ const ReceiverView: React.FC = () => {
     };
   }, []);
 
+  // The presenter's camera: borrowed from the presenter window that opened this one, or (a projector
+  // window opened by hand) the same camera opened here
+  const isCameraActive = !!cameraSync?.active;
+  const borrowedCamera = useMemo(
+    () => (isCameraActive ? getOpenerCameraStream(cameraSync?.streamId) : null),
+    [isCameraActive, cameraSync?.streamId]
+  );
+  const ownCamera = useCameraStream(isCameraActive && !borrowedCamera, cameraSync?.deviceId ?? '');
+  const cameraStream: MediaStream | null = isCameraActive ? borrowedCamera ?? ownCamera.stream : null;
+
   if (slides.length === 0) {
     return (
       <div className="w-full h-screen bg-black flex items-center justify-center text-neutral-500">
@@ -153,102 +160,28 @@ const ReceiverView: React.FC = () => {
     );
   }
 
-  // The receiver mimics the logic of the main App for displaying slides
-  // But without controls or overview interactions
-  return (
-    <div ref={receiverContainerRef} className={clsx("relative w-full h-screen bg-black overflow-hidden select-none receiver-container", (isSpotlight || isLaser) ? "cursor-none" : "cursor-default")}>
-      <AnimatePresence mode="wait">
-        {mode === AppMode.PRESENTATION && (
-          <motion.div
-            key="presentation-view"
-            className="absolute inset-0 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-             {/* Enforce 16:9 Aspect Ratio Container for Matching Viewport */}
-             <div className="relative w-full h-full flex items-center justify-center overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '100%' }}>
-                <img
-                  key={`slide-${slides[currentIndex].id}`}
-                  src={slides[currentIndex].src}
-                  alt={slides[currentIndex].name}
-                  className="w-auto h-auto max-w-full max-h-full object-contain transition-transform duration-200"
-                  style={{
-                    transform: zoomState.level > 1.0
-                      ? `scale(${zoomState.level}) translate(${zoomState.panX * 100}%, ${zoomState.panY * 100}%)`
-                      : 'none',
-                    transformOrigin: 'center center',
-                  }}
-                />
-              <MediaOverlay
-                media={slides[currentIndex].media || []}
-                mediaMap={mediaMap}
-                containerRef={receiverContainerRef}
-                slideId={slides[currentIndex].id}
-                zoomLevel={zoomState.level}
-                panX={zoomState.panX}
-                panY={zoomState.panY}
-                playing={isMediaActive}
-              />
-              {/* Links visible on receiver but disabled (projector shouldn't have clickable links) */}
-              <LinkOverlay
-                links={slides[currentIndex].links || []}
-                containerRef={receiverContainerRef}
-                disabled={true}
-                zoomLevel={zoomState.level}
-                panX={zoomState.panX}
-                panY={zoomState.panY}
-              />
-              {/* Presenter's ink, mirrored read-only */}
-              <AnnotationLayer
-                annotations={annotations[currentIndex] || []}
-                draft={annotationDraft.index === currentIndex ? annotationDraft.annotation : null}
-                containerRef={receiverContainerRef}
-                zoomLevel={zoomState.level}
-                panX={zoomState.panX}
-                panY={zoomState.panY}
-              />
-             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* If overview is active in presenter, we might want to just show black or stay on current slide. 
-          For now, mimicking the main view behavior (showing slide). Impressive usually shows overview on both. */}
-      <AnimatePresence>
-         {mode === AppMode.OVERVIEW && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/90">
-                {/* Simplified Overview for Receiver - usually projectors show overview too */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-8">
-                     {slides.map((slide, index) => (
-                        <div key={slide.id} className={clsx("opacity-50", index === currentIndex && "opacity-100 ring-2 ring-blue-500")}>
-                             <img src={slide.src} className="w-full aspect-video object-cover" />
-                        </div>
-                     ))}
-                </div>
-            </div>
-         )}
-      </AnimatePresence>
+  const audienceState: AudienceState = {
+    index: currentIndex,
+    mode,
+    isSpotlight,
+    spotlightPosition,
+    isLaser,
+    laserPosition,
+    zoomState,
+    isMediaActive,
+    isBlackScreen,
+  };
 
-      <SpotlightLayer 
-        isActive={isSpotlight} 
-        position={spotlightPosition}
-        containerRef={receiverContainerRef}
-        zoomLevel={zoomState.level}
-        panX={zoomState.panX}
-        panY={zoomState.panY}
-      />
-      <LaserPointer 
-        isActive={isLaser} 
-        position={laserPosition} 
-        containerRef={receiverContainerRef} 
-        zoomLevel={zoomState.level}
-        panX={zoomState.panX}
-        panY={zoomState.panY}
-      />
-      {/* Black screen (B or . on the presenter or a clicker) */}
-      {isBlackScreen && <div className="fixed inset-0 z-[70] bg-black" aria-label="Black screen" />}
-    </div>
+  return (
+    <AudienceView
+      className="receiver-container"
+      slides={slides}
+      state={audienceState}
+      annotations={annotations[currentIndex] || []}
+      draft={annotationDraft.index === currentIndex ? annotationDraft.annotation : null}
+      mediaMap={mediaMap}
+      camera={{ settings: cameraSync?.settings ?? DEFAULT_CAMERA_SETTINGS, stream: cameraStream }}
+    />
   );
 };
 

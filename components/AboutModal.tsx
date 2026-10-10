@@ -117,6 +117,10 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <span>Toggle dual-screen mode</span>
                         </div>
                         <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">V</kbd>
+                          <span>Show/hide your camera on the slides</span>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">F</kbd>
                           <span>Toggle fullscreen</span>
                         </div>
@@ -134,7 +138,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         </div>
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">P</kbd>
-                          <span>Pause/Resume timer</span>
+                          <span>Pause/Resume timer (and the recording)</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">Escape</kbd>
@@ -288,6 +292,8 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>Use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">S</kbd> for spotlight or <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">L</kbd> for laser pointer</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">N</kbd> to draw on the slide (pen, highlighter, shapes); annotations are mirrored to the projector and kept per slide</li>
                     <li>GIFs and videos marked in the Beamer PDF play over their stills on both screens: open a PDF that carries its GIFs, or use "Open folder with animations" to load the PDF with its folder. Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">M</kbd> to turn them on/off</li>
+                    <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">V</kbd> to show your camera on the slides (both screens); the camera button sets its shape, size, corner and device, and you can drag it on the slide. A <code className="text-xs">wpcamera:</code> link in the Beamer PDF places it on that slide, <code className="text-xs">wpcamera:off</code> hides it</li>
+                    <li>Record your talk with the red record button: voice, slides, ink, laser and camera. Each slide visit is its own clip, so one slide can be re-recorded. Play recordings back, or tick them and press Download for a video or audio-only file. They stay in this browser on this computer</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">P</kbd> to pause/resume the presentation timer during preparation</li>
                     <li>In dual-screen mode, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">T</kbd> and <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd> to scroll speaker notes line-by-line</li>
                     <li>Click embedded links in the PDF to navigate or open external URLs</li>
@@ -324,12 +330,12 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <strong className="text-blue-400">Latest Release:</strong>
                       </p>
                       <a 
-                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.6" 
+                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.7" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
                       >
-                        v0.1.6 (October 2026)
+                        v0.1.7 (October 2026)
                       </a>
                     </div>
                     <div>
@@ -340,23 +346,23 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Windows: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive.Setup.0.1.6.exe" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive.Setup.0.1.7.exe" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive Setup 0.1.6.exe
+                            WebPressive Setup 0.1.7.exe
                           </a>
                         </div>
                         <div>
                           <span className="text-neutral-400">Linux: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.6/WebPressive-0.1.6.AppImage" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive-0.1.7.AppImage" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive-0.1.6.AppImage
+                            WebPressive-0.1.7.AppImage
                           </a>
                         </div>
                       </div>

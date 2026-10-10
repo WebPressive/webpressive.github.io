@@ -387,7 +387,7 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
 
         <div className="space-y-4 -mt-16">
           {/* Keyboard Shortcuts */}
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-neutral-500">
+          <div className="grid grid-cols-2 sm:grid-cols-[repeat(4,auto)] justify-center gap-x-8 gap-y-3 text-sm text-neutral-500">
             <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">TAB</span>
               <span>Overview</span>
@@ -418,10 +418,11 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
             </div>
             <button
               onClick={() => setShowAbout(true)}
-              className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
+              className="relative flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
               title="About (A)"
             >
-              <Info className="w-4 h-4" />
+              {/* The icon hangs left of the key, so the A key lines up with the keys above it */}
+              <Info className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4" />
               <span className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700">A</span>
               <span>About</span>
             </button>
@@ -431,12 +432,12 @@ const UploadScreen: React.FC<UploadScreenProps> = ({ onSlidesLoaded }) => {
           <div className="flex justify-center items-center gap-4 text-sm relative z-50">
             <span className="text-neutral-500">Standalone version:</span>
             <a
-              href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.6"
+              href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.7"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 transition-colors font-semibold underline cursor-pointer relative z-50"
             >
-              v0.1.6
+              v0.1.7
             </a>
           </div>
 

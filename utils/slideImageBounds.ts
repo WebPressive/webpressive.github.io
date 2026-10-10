@@ -12,14 +12,16 @@ export interface ImageBounds {
  * Accounts for object-fit: contain letterboxing. Because getBoundingClientRect already includes
  * the CSS zoom/pan transform, the returned bounds describe the image as currently drawn on screen,
  * so a normalized (0-1) slide coordinate maps to `x + nx * width`, `y + ny * height` at any zoom.
+ * With `ignoreTransform`, the bounds are those of the unzoomed slide frame instead (layout box, no zoom/pan),
+ * for overlays that stay put while the slide zooms (the presenter's camera).
  */
-export function getSlideImageBounds(container: HTMLElement | null): ImageBounds | null {
+export function getSlideImageBounds(container: HTMLElement | null, ignoreTransform = false): ImageBounds | null {
   const root = container || document.body;
   const img = root.querySelector('img[class*="object-contain"]') as HTMLImageElement | null;
   if (!img || !img.naturalWidth || !img.naturalHeight) return null;
 
-  const rect = img.getBoundingClientRect();
-  if (!rect.width || !rect.height) return null;
+  const rect = ignoreTransform ? layoutRect(img) : img.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return null;
 
   const naturalRatio = img.naturalWidth / img.naturalHeight;
   const visibleRatio = rect.width / rect.height;
@@ -42,6 +44,19 @@ export function getSlideImageBounds(container: HTMLElement | null): ImageBounds 
   return { x: rect.left + left, y: rect.top + top, width, height };
 }
 
+// Viewport rect of an element's layout box, ignoring its own CSS transform
+function layoutRect(el: HTMLElement): { left: number; top: number; width: number; height: number } | null {
+  const parent = el.offsetParent as HTMLElement | null;
+  if (!parent) return null;
+  const origin = parent.getBoundingClientRect();
+  return {
+    left: origin.left + parent.clientLeft + el.offsetLeft,
+    top: origin.top + parent.clientTop + el.offsetTop,
+    width: el.offsetWidth,
+    height: el.offsetHeight,
+  };
+}
+
 export function sameBounds(a: ImageBounds | null, b: ImageBounds | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -58,12 +73,14 @@ const SETTLE_MS = 400;
  * and on window/container resize or slide image load, so the bounds are correct once the CSS transition ends.
  * Bounds are in viewport pixels, or relative to `relativeTo`'s box when given
  * (for overlays positioned inside the container rather than fixed to the viewport).
+ * `ignoreTransform` measures the unzoomed slide frame (see getSlideImageBounds).
  */
 export function useSlideImageBounds(
   containerRef: React.RefObject<HTMLElement> | undefined,
   active: boolean,
   deps: ReadonlyArray<unknown> = [],
-  relativeTo?: React.RefObject<Element>
+  relativeTo?: React.RefObject<Element>,
+  ignoreTransform = false
 ): ImageBounds | null {
   const [bounds, setBounds] = useState<ImageBounds | null>(null);
 
@@ -72,7 +89,7 @@ export function useSlideImageBounds(
     let settleUntil = performance.now() + SETTLE_MS;
 
     const update = () => {
-      let next = getSlideImageBounds(containerRef?.current ?? null);
+      let next = getSlideImageBounds(containerRef?.current ?? null, ignoreTransform);
       const origin = relativeTo?.current?.getBoundingClientRect();
       if (next && origin) {
         next = { ...next, x: next.x - origin.left, y: next.y - origin.top };
@@ -110,7 +127,7 @@ export function useSlideImageBounds(
       if (frame) cancelAnimationFrame(frame);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerRef, relativeTo, active, ...deps]);
+  }, [containerRef, relativeTo, active, ignoreTransform, ...deps]);
 
   return bounds;
 }
