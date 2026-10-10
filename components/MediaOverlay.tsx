@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { MediaMap, PDFMedia } from '../types';
 import { ImageBounds, useSlideImageBounds } from '../utils/slideImageBounds';
+import { MEDIA_BADGE_HEIGHT_RATIO } from '../constants';
 
 interface MediaOverlayProps {
   media: PDFMedia[];
@@ -43,14 +44,13 @@ const MediaItem: React.FC<MediaItemProps> = ({ item, url, bounds }) => {
   return <img src={url} style={style} alt="" draggable={false} onError={onError} />;
 };
 
-// Play badge of an animated still, redrawn above the playing GIF (the PDF draws the same badge, but the
-// GIF covers the quarter of it that lies inside the picture). Its centre sits on the media's bottom-left
-// corner, as in the Beamer decks (\animstill / \videostill): a 2.2 mm orange disc with a white triangle on a
-// 160 mm wide page. It takes no pointer input; the PDF's own link on the badge (LinkOverlay) handles the click.
-const BADGE_DIAMETER = 2.2 / 160; // fraction of the page width (Beamer 16:9 page); halved 2026-10-10 so adjacent GIFs are not covered
-
+// Play badge of an animated still, redrawn above the playing GIF (a deck may draw a badge in the PDF too,
+// which the GIF partly covers). Its centre sits on the media's bottom-left corner, as in the Beamer decks
+// (\animstill / \videostill): an orange disc with a white triangle. Its diameter follows the media's presented
+// height, so thumbnails get small badges and large clips larger ones. It takes no pointer input; a PDF link
+// on the badge (LinkOverlay) handles the click.
 const PlayBadge: React.FC<{ item: PDFMedia; bounds: ImageBounds }> = ({ item, bounds }) => {
-  const d = BADGE_DIAMETER * bounds.width;
+  const d = MEDIA_BADGE_HEIGHT_RATIO * item.height * bounds.height;
   const cx = bounds.x + item.x * bounds.width;
   const cy = bounds.y + (item.y + item.height) * bounds.height;
   return (

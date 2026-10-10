@@ -34,3 +34,6 @@ export const TEXT_FONT_FAMILY = 'ui-sans-serif, system-ui, -apple-system, "Segoe
 export const HIGHLIGHTER_OPACITY = 0.45;
 export const ANNOTATION_HISTORY_LIMIT = 100;
 export const ANNOTATION_STORAGE_KEY = 'webpressive_annotations';
+// Play badge of an animated still: diameter as a fraction of the media's presented height
+// (a 12 mm tall thumbnail gets a 1.8 mm badge, a 25 mm tall clip a 3.75 mm one)
+export const MEDIA_BADGE_HEIGHT_RATIO = 0.15;

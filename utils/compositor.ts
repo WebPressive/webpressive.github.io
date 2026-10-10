@@ -2,7 +2,7 @@ import { Annotation, AppMode, PDFMedia, SlideData } from '../types';
 import { PlaybackFrame } from './timelineCursor';
 import { cameraBox } from './camera';
 import { smoothPath, straightPath, Px } from '../components/AnnotationLayer';
-import { HIGHLIGHTER_OPACITY, SPOTLIGHT_SIZE, TEXT_FONT_FAMILY, TEXT_LINE_HEIGHT } from '../constants';
+import { HIGHLIGHTER_OPACITY, MEDIA_BADGE_HEIGHT_RATIO, SPOTLIGHT_SIZE, TEXT_FONT_FAMILY, TEXT_LINE_HEIGHT } from '../constants';
 
 /**
  * Draws one frame of what the audience saw onto a canvas, for video export. Mirrors AudienceView:
@@ -15,7 +15,6 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Source = CanvasImageSource;
 
 const REFERENCE_WIDTH = 1920;
-const BADGE_DIAMETER = 2.2 / 160; // Play badge of an animated still, fraction of the page width (same as MediaOverlay)
 
 /** Decoded frames of one GIF or video used by the deck, by time (looping). */
 export interface AnimatedMedia {
@@ -107,7 +106,7 @@ function drawAnnotation(ctx: Ctx, a: Annotation, W: number, H: number) {
 }
 
 function drawPlayBadge(ctx: Ctx, item: PDFMedia, W: number, H: number) {
-  const d = BADGE_DIAMETER * W;
+  const d = MEDIA_BADGE_HEIGHT_RATIO * item.height * H; // same as MediaOverlay
   const cx = item.x * W - W / 2;
   const cy = (item.y + item.height) * H - H / 2;
   const unit = d / 4.4;
