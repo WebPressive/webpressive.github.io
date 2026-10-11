@@ -152,6 +152,13 @@ export interface ClipSummary {
   hasVideo: boolean;
 }
 
+// One spoken line of the transcript, saved with the clip it was said in: t..e ms from the clip start, x = text
+export interface TranscriptSegment {
+  t: number;
+  e: number;
+  x: string;
+}
+
 export interface ClipData extends ClipSummary {
   recordingId: string;
   mimeType: string;
@@ -159,7 +166,9 @@ export interface ClipData extends ClipSummary {
   complete: boolean; // false while recording (or if the page closed mid-clip)
   initial: ClipInitialState;
   events: TimelineEvent[];
+  transcript?: TranscriptSegment[]; // When the transcript was on while recording
 }
+
 
 export interface RecordingMeta {
   id: string;
@@ -178,6 +187,8 @@ export type SyncMessage =
   | { type: 'ANNOTATIONS_SYNC'; annotations: AnnotationMap }
   | { type: 'ANNOTATION_DRAFT'; index: number; annotation: Annotation | null }
   | { type: 'MEDIA_SYNC'; files: MediaFile[] }
+  // Live captions on the audience view (null: none). Sent only while the presenter shows them to the audience.
+  | { type: 'CAPTION_SYNC'; text: string | null }
   // Camera on the slides. `active` once the presenter's stream is live; the projector window borrows that
   // stream (matched by `streamId`) from its opener, or opens `deviceId` itself.
   | { type: 'CAMERA_SYNC'; active: boolean; settings: CameraSettings; streamId?: string; deviceId?: string }

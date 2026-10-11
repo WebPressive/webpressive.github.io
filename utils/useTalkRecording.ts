@@ -25,6 +25,7 @@ interface Options {
   videoTrack: MediaStreamTrack | null; // The camera, when it is shown on the slides
   micDeviceId: string;
   onNotice: (text: string) => void;
+  flushTranscript?: () => Promise<void>; // Waits for the line being spoken when the transcript is on
 }
 
 /**
@@ -32,7 +33,7 @@ interface Options {
  * slide, and this deck's saved recordings. Clips go into the selected recording; with none selected,
  * the next start makes a new one.
  */
-export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack, micDeviceId, onNotice }: Options) {
+export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack, micDeviceId, onNotice, flushTranscript }: Options) {
   const [status, setStatus] = useState<RecordingStatus>('idle');
   const [countdown, setCountdown] = useState(0);
   const [replaceSlide, setReplaceSlide] = useState<number | null>(null);
@@ -51,6 +52,10 @@ export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack
   });
 
   const recorderRef = useRef<TalkRecorder | null>(null);
+  // Takes transcript lines while recording and while stopping (the last words arrive late)
+  const transcriptTargetRef = useRef<TalkRecorder | null>(null);
+  const flushTranscriptRef = useRef(flushTranscript);
+  flushTranscriptRef.current = flushTranscript;
   const sessionRef = useRef<{ recordingId: string; replaceSlide: number | null; clips: ClipSummary[] } | null>(null);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve()); // Recording updates, one at a time
   const inputRef = useRef(input);
@@ -175,6 +180,7 @@ export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack
       onError: (message) => noticeRef.current(message),
     });
     recorderRef.current = recorder;
+    transcriptTargetRef.current = recorder;
     recorder.start();
     setStatus('recording');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,6 +195,9 @@ export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack
     recorderRef.current = null;
     setStatus('stopping');
     await recorder.stop();
+    if (flushTranscriptRef.current) await flushTranscriptRef.current();
+    await recorder.settled();
+    if (transcriptTargetRef.current === recorder) transcriptTargetRef.current = null;
     await queueRef.current;
     const session = sessionRef.current;
     sessionRef.current = null;
@@ -308,6 +317,8 @@ export function useTalkRecording({ enabled, deckKey, deckName, input, videoTrack
     remove,
     clearSlide,
     refresh,
+    // A finished transcript line, saved with the clip it was spoken in
+    addTranscript: (line: { start: number; end: number; text: string }) => transcriptTargetRef.current?.addTranscript(line),
   };
 }
 

@@ -16,9 +16,15 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
+      // The speech worker (live transcript) is an ES module worker
+      worker: {
+        format: 'es',
+      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          // The live transcript runs ONNX Runtime on WebAssembly only: its WebGPU build would add 27 MB
+          'onnxruntime-web/webgpu': 'onnxruntime-web/wasm',
         }
       },
       build: {

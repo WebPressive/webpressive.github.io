@@ -46,6 +46,14 @@ function stateDiff(prev: AudienceState, next: AudienceState): Partial<AudienceSt
   return changed ? diff : null;
 }
 
+// A clip's place in time, kept after it ends so transcript lines that arrive late still find it
+interface ClipSpan {
+  data: ClipData;
+  t0: number;
+  t1: number | null; // null while recording
+  saved: Promise<boolean> | null; // Resolves once the clip is saved (false: dropped as too short)
+}
+
 interface ActiveClip {
   data: ClipData;
   recorder: MediaRecorder;
@@ -75,7 +83,8 @@ export class TalkRecorder {
   private latest: RecorderInput;
   private videoTrack: MediaStreamTrack | null;
   private finishedMs = 0;
-  private pending: Promise<void>[] = [];
+  private pending: Promise<unknown>[] = [];
+  private spans: ClipSpan[] = [];
 
   constructor(
     private recordingId: string,
@@ -152,6 +161,34 @@ export class TalkRecorder {
     await Promise.all(this.pending);
   }
 
+  /**
+   * A transcript line (times from performance.now()), saved with the clip it was spoken in: the clip
+   * where it started, else where it ended. Works after stop() too, for the last words.
+   */
+  addTranscript(line: { start: number; end: number; text: string }) {
+    const covers = (span: ClipSpan, t: number) => t >= span.t0 && (span.t1 === null || t < span.t1);
+    const span = this.spans.find((s) => covers(s, line.start)) ?? this.spans.find((s) => covers(s, line.end));
+    if (!span) return; // Said while paused
+    const length = (span.t1 ?? performance.now()) - span.t0;
+    const t = Math.max(0, Math.round(line.start - span.t0));
+    const e = Math.max(t, Math.round(Math.min(line.end - span.t0, span.t1 === null ? Infinity : length)));
+    (span.data.transcript ??= []).push({ t, e, x: line.text });
+    if (span.saved) {
+      // Already saved: save again with the new line
+      const data = span.data;
+      this.pending.push(span.saved.then((kept: boolean) => (kept ? putClip(data) : undefined)).catch(() => {}));
+    }
+  }
+
+  /** Resolves once every save, including late transcript lines, is done. */
+  async settled(): Promise<void> {
+    let count: number;
+    do {
+      count = this.pending.length;
+      await Promise.all(this.pending);
+    } while (count !== this.pending.length);
+  }
+
   // The next clip starts before the previous one stops, so no sound falls between them
   private roll() {
     const previous = this.active;
@@ -217,6 +254,7 @@ export class TalkRecorder {
       this.callbacks.onError?.(`Recording stopped with an error: ${(event as unknown as { error?: Error }).error?.message ?? 'unknown'}`);
     };
     this.active = clip;
+    this.spans.push({ data, t0: clip.t0, t1: null, saved: null });
     recorder.start(CHUNK_MS);
     clip.writes.push(putClip(data).catch(() => {}));
     this.callbacks.onClipStarted?.(summaryOf(data));
@@ -235,8 +273,10 @@ export class TalkRecorder {
             clip.recorder.stop();
           });
     this.finishedMs += durationMs;
+    const span = this.spans.find((s) => s.data === clip.data);
+    if (span) span.t1 = clip.t0 + durationMs;
 
-    const saved = (async () => {
+    const saved = (async (): Promise<boolean> => {
       await Promise.race([stopped, new Promise((resolve) => setTimeout(resolve, 3000))]);
       clip.videoTrack?.stop();
       await Promise.all(clip.writes);
@@ -246,15 +286,18 @@ export class TalkRecorder {
         this.finishedMs -= durationMs;
         await deleteClips([data.id]).catch(() => {});
         this.callbacks.onClipDropped?.(data.id);
-        return;
+        return false;
       }
       data.durationMs = durationMs;
       data.complete = true;
       await putClip(data);
       this.callbacks.onClipFinished?.(summaryOf(data));
+      return true;
     })().catch((error: unknown) => {
       this.callbacks.onError?.(`Could not save a recording clip: ${(error as Error)?.message ?? error}`);
+      return false;
     });
+    if (span) span.saved = saved;
     this.pending.push(saved);
   }
 }

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@huggingface/transformers": "4.3.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.24.10",
     "lucide-react": "^0.562.0",

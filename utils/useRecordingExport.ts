@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react';
-import { MediaMap, RecordingMeta, SlideData } from '../types';
+import { ClipData, MediaMap, RecordingMeta, SlideData } from '../types';
 import type { ExportKind } from './exportRecording';
+import { getClip } from './recordingStore';
+import { downloadBlob } from './download';
+import { recordingLines, toPlainText, toSrt } from './transcriptExport';
+
+// A video or sound file, or the spoken text: subtitles (.srt) or a plain transcript (.txt)
+export type DownloadKind = ExportKind | 'subtitles' | 'transcript';
+const KINDS: DownloadKind[] = ['video', 'audio', 'subtitles', 'transcript'];
 
 const PREFERENCE_KEY = 'webpressive_export';
 
@@ -8,14 +15,14 @@ export interface ExportJob {
   name: string; // Recording being exported
   index: number; // Its place among the recordings asked for (0-based)
   count: number;
-  kind: ExportKind;
+  kind: DownloadKind;
   progress: number; // 0..1 for the current recording
 }
 
-function loadPreference(): { kind: ExportKind; height: number } {
+function loadPreference(): { kind: DownloadKind; height: number } {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFERENCE_KEY) || '{}');
-    return { kind: saved.kind === 'audio' ? 'audio' : 'video', height: [720, 1080, 1440].includes(saved.height) ? saved.height : 1440 };
+    return { kind: KINDS.includes(saved.kind) ? saved.kind : 'video', height: [720, 1080, 1440].includes(saved.height) ? saved.height : 1440 };
   } catch {
     return { kind: 'video', height: 1440 };
   }
@@ -30,7 +37,7 @@ export function useRecordingExport(slides: SlideData[], mediaMap: MediaMap, deck
   const [preference, setPreferenceState] = useState(loadPreference);
   const abortRef = useRef<AbortController | null>(null);
 
-  const setPreference = (changes: Partial<{ kind: ExportKind; height: number }>) => {
+  const setPreference = (changes: Partial<{ kind: DownloadKind; height: number }>) => {
     const next = { ...preference, ...changes };
     setPreferenceState(next);
     try {
@@ -40,8 +47,12 @@ export function useRecordingExport(slides: SlideData[], mediaMap: MediaMap, deck
     }
   };
 
-  const run = async (recordings: RecordingMeta[], kind: ExportKind = preference.kind) => {
+  const run = async (recordings: RecordingMeta[], kind: DownloadKind = preference.kind) => {
     if (job || recordings.length === 0) return;
+    if (kind === 'subtitles' || kind === 'transcript') {
+      await downloadText(recordings, kind);
+      return;
+    }
     const controller = new AbortController();
     abortRef.current = controller;
     let saved = 0;
@@ -69,6 +80,31 @@ export function useRecordingExport(slides: SlideData[], mediaMap: MediaMap, deck
     } finally {
       abortRef.current = null;
       setJob(null);
+    }
+  };
+
+  // Text files are quick: no progress, no encoder
+  const downloadText = async (recordings: RecordingMeta[], kind: 'subtitles' | 'transcript') => {
+    let saved = 0;
+    try {
+      for (const recording of recordings) {
+        const clips = (await Promise.all(recording.clips.map((c) => getClip(c.id)))).filter((c): c is ClipData => !!c && c.durationMs > 0);
+        const lines = recordingLines(clips);
+        if (lines.length === 0) continue;
+        const text = kind === 'subtitles' ? toSrt(lines) : toPlainText(lines);
+        const extension = kind === 'subtitles' ? 'srt' : 'txt';
+        downloadBlob(new Blob([text], { type: kind === 'subtitles' ? 'application/x-subrip' : 'text/plain' }), `${deckName || 'Talk'} - ${recording.name}.${extension}`);
+        saved++;
+      }
+      if (saved < recordings.length) {
+        onNotice(
+          saved === 0
+            ? `No transcript in ${recordings.length === 1 ? 'this recording' : 'these recordings'}: turn the transcript on (W) while recording.`
+            : `${recordings.length - saved} of the recordings had no transcript.`
+        );
+      }
+    } catch (error) {
+      onNotice(`Could not create the file: ${(error as Error)?.message ?? error}`);
     }
   };
 

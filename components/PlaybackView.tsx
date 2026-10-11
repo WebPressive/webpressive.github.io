@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Pause, Play, RotateCcw, SkipBack, SkipForward, X } from 'lucide-react';
+import { Captions, Download, Pause, Play, RotateCcw, SkipBack, SkipForward, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ClipData, MediaMap, RecordingMeta, SlideData } from '../types';
 import AudienceView from './AudienceView';
 import { formatDuration, getClip, getClipBlob, getRecording } from '../utils/recordingStore';
 import { PlaybackFrame, TimelineCursor } from '../utils/timelineCursor';
 import { RecordingExport } from '../utils/useRecordingExport';
+import { captionAt, hasTranscript } from '../utils/transcriptExport';
 
 interface PlaybackViewProps {
   recordingId: string;
@@ -18,6 +19,7 @@ interface PlaybackViewProps {
 
 const SPEEDS = [1, 1.25, 1.5, 2];
 const CONTROLS_HIDE_MS = 2500;
+const CAPTIONS_KEY = 'webpressive_playback_captions';
 
 /**
  * Plays a recording in the presenter window: each clip's sound and camera from its media file, and
@@ -37,6 +39,16 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
   const [time, setTime] = useState(0); // ms into the whole recording, for the controls
   const [showControls, setShowControls] = useState(true);
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
+  // Captions from the recording's transcript (C), on unless turned off before
+  const [captionsOn, setCaptionsOn] = useState(() => {
+    try {
+      return localStorage.getItem(CAPTIONS_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [caption, setCaption] = useState<string | null>(null);
+  const captionRef = useRef<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cursorRef = useRef<TimelineCursor | null>(null);
@@ -60,6 +72,17 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
     });
   }, [clips]);
   const total = clips ? clips.reduce((sum, clip) => sum + clip.durationMs, 0) : 0;
+  const hasText = useMemo(() => !!clips && hasTranscript(clips), [clips]);
+  const toggleCaptions = useCallback(() => {
+    setCaptionsOn((on: boolean) => {
+      try {
+        localStorage.setItem(CAPTIONS_KEY, String(!on));
+      } catch {
+        // Per session only
+      }
+      return !on;
+    });
+  }, []);
   const clip = clips?.[clipIndex] ?? null;
 
   const live = useRef({ clipIndex, clips, offsets, isPlaying, speed });
@@ -243,6 +266,11 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
           frameRef.current = f;
           setFrame(f);
         }
+        const text = captionAt(live.current.clips?.[live.current.clipIndex]?.transcript, t);
+        if (text !== captionRef.current) {
+          captionRef.current = text;
+          setCaption(text);
+        }
         if (now - lastUi > 100 && !scrubbingRef.current) {
           lastUi = now;
           const { offsets: starts, clipIndex: current } = live.current;
@@ -281,12 +309,17 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
           e.preventDefault();
           onClose();
           break;
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          toggleCaptions();
+          break;
       }
       setShowControls(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, next, previous, onClose]);
+  }, [togglePlay, next, previous, onClose, toggleCaptions]);
 
   // Controls hide while playing and the mouse rests
   useEffect(() => {
@@ -340,6 +373,7 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
             draft={frame.draft}
             mediaMap={mediaMap}
             camera={{ settings: frame.camera, video, hidden: !clip.hasVideo }}
+            caption={captionsOn ? caption : null}
           />
         </div>
       ) : (
@@ -430,6 +464,20 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
             </option>
           ))}
         </select>
+        {hasText && (
+          <button
+            onClick={(e) => {
+              e.currentTarget.blur();
+              toggleCaptions();
+            }}
+            className={clsx('p-2 rounded-xl', captionsOn ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-neutral-400')}
+            title={captionsOn ? 'Hide captions (C)' : 'Show captions (C)'}
+            aria-label="Captions"
+            aria-pressed={captionsOn}
+          >
+            <Captions className="w-5 h-5" />
+          </button>
+        )}
         {/* Download this recording */}
         <div className="relative">
           {exporter.job ? (
@@ -459,6 +507,12 @@ const PlaybackView: React.FC<PlaybackViewProps> = ({ recordingId, startClip = 0,
               {([
                 ['video', 'Video', 'Slides, camera and voice'],
                 ['audio', 'Audio only', 'Your voice'],
+                ...(hasText
+                  ? ([
+                      ['subtitles', 'Subtitles (.srt)', 'What you said, timed to the video'],
+                      ['transcript', 'Transcript (.txt)', 'What you said, by slide'],
+                    ] as const)
+                  : []),
               ] as const).map(([kind, label, detail]) => (
                 <button
                   key={kind}

@@ -3,7 +3,7 @@ import { Circle, Download, GripHorizontal, Play, Plus, RotateCcw, Trash2, X } fr
 import { clsx } from 'clsx';
 import { RecordingMeta } from '../types';
 import { TalkRecording } from '../utils/useTalkRecording';
-import { RecordingExport } from '../utils/useRecordingExport';
+import { DownloadKind, RecordingExport } from '../utils/useRecordingExport';
 import { useDraggablePanel } from '../utils/draggablePanel';
 import { formatBytes, formatDuration, recordingBytes, recordingDuration } from '../utils/recordingStore';
 
@@ -246,13 +246,15 @@ const RecordingPanel: React.FC<RecordingPanelProps> = ({ isOpen, onClose, record
               <div className="flex gap-2">
                 <select
                   value={exporter.preference.kind}
-                  onChange={(e) => exporter.setPreference({ kind: e.target.value as 'video' | 'audio' })}
+                  onChange={(e) => exporter.setPreference({ kind: e.target.value as DownloadKind })}
                   disabled={!!job}
                   className="flex-1 min-w-0 bg-neutral-800 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs"
                   aria-label="Download as"
                 >
                   <option value="video">Video</option>
                   <option value="audio">Audio only</option>
+                  <option value="subtitles">Subtitles (.srt)</option>
+                  <option value="transcript">Transcript (.txt)</option>
                 </select>
                 {exporter.preference.kind === 'video' && (
                   <select
@@ -302,7 +304,11 @@ const RecordingPanel: React.FC<RecordingPanelProps> = ({ isOpen, onClose, record
               <p className="text-[11px] text-neutral-500 leading-snug">
                 {exporter.preference.kind === 'video'
                   ? 'A video of what the audience saw, with your camera and voice (MP4, or WebM where the browser cannot make MP4). Takes a while for long talks; keep this window open.'
-                  : 'Your voice only (M4A, or Ogg where M4A is not available).'}
+                  : exporter.preference.kind === 'audio'
+                  ? 'Your voice only (M4A, or Ogg where M4A is not available).'
+                  : exporter.preference.kind === 'subtitles'
+                  ? 'What you said, timed to the video: load it next to the downloaded video in a player or on a video site. Needs the transcript (W) on while recording.'
+                  : 'What you said as plain text, by slide. Needs the transcript (W) on while recording.'}
               </p>
             </div>
           )}

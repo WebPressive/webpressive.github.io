@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play, Video, Circle } from 'lucide-react';
+import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play, Video, Circle, Captions } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -24,6 +24,8 @@ interface ControlsProps {
   onCameraClick?: () => void; // Opens the camera settings
   isRecording?: boolean;
   onRecordClick?: () => void; // Opens the recording panel
+  isTranscriptOn?: boolean;
+  onTranscriptClick?: () => void; // Turns the live transcript on/off
   toggleDualScreen?: () => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -52,6 +54,8 @@ const Controls: React.FC<ControlsProps> = ({
   onCameraClick,
   isRecording = false,
   onRecordClick,
+  isTranscriptOn = false,
+  onTranscriptClick,
   toggleDualScreen,
   nextSlide,
   prevSlide,
@@ -201,6 +205,18 @@ const Controls: React.FC<ControlsProps> = ({
             aria-label="Recording"
           >
             <Circle className={clsx("w-5 h-5", isRecording ? "fill-current animate-pulse" : "text-red-500")} />
+          </button>
+        )}
+
+        {onTranscriptClick && (
+          <button
+            onClick={onTranscriptClick}
+            className={clsx("p-2 rounded-xl transition-colors", isTranscriptOn ? "bg-blue-600 text-white" : "hover:bg-white/10")}
+            title={isTranscriptOn ? "Transcript on (W turns it off)" : "Live transcript (W)"}
+            aria-label="Live transcript"
+            aria-pressed={isTranscriptOn}
+          >
+            <Captions className="w-5 h-5" />
           </button>
         )}
 

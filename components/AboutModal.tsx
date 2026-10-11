@@ -121,6 +121,10 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <span>Show/hide your camera on the slides</span>
                         </div>
                         <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">W</kbd>
+                          <span>Live transcript on/off</span>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">F</kbd>
                           <span>Toggle fullscreen</span>
                         </div>
@@ -294,7 +298,9 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>GIFs and videos marked in the Beamer PDF play over their stills on both screens: open a PDF that carries its GIFs, or use "Open folder with animations" to load the PDF with its folder. Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">M</kbd> to turn them on/off</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">V</kbd> to show your camera on the slides (both screens); the camera button sets its shape, size, corner and device, and you can drag it on the slide. A <code className="text-xs">wpcamera:</code> link in the Beamer PDF places it on that slide, <code className="text-xs">wpcamera:off</code> hides it</li>
                     <li>Record your talk with the red record button: voice, slides, ink, laser and camera. Each slide visit is its own clip, so one slide can be re-recorded. Play recordings back, or tick them and press Download for a video or audio-only file. They stay in this browser on this computer</li>
+                    <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">W</kbd> for a live transcript of what you say, made on this computer (English; the first time downloads a 28 MB speech model). In dual-screen mode it is a block you drag like the notes; it can also show as captions to the audience. While recording, the text is saved with the recording: captions in playback, subtitles (.srt) or a transcript (.txt) to download</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">P</kbd> to pause/resume the presentation timer during preparation</li>
+                    <li>In dual-screen mode, drag the speaker notes (by their title bar) or the next-slide preview beside, above or below the current slide, or anywhere else to float it; drag the edges between sections to resize, double-click an edge to reset it</li>
                     <li>In dual-screen mode, use <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">T</kbd> and <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">G</kbd> to scroll speaker notes line-by-line</li>
                     <li>Click embedded links in the PDF to navigate or open external URLs</li>
                     <li>Press <kbd className="px-1.5 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-xs">TAB</kbd> to see all slides in overview mode</li>
@@ -313,7 +319,8 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <li>Spotlight and laser pointer tools</li>
                     <li>Animated GIFs and videos on slides, played over their stills on both screens</li>
                     <li>Embedded PDF links are preserved and clickable</li>
-                    <li>Resizable panels in presenter view</li>
+                    <li>Presenter view arranged by dragging: notes and next slide beside, above or below the current slide, or floating; every section resizable (remembered)</li>
+                    <li>Live transcript and captions, made on this computer</li>
                     <li>Real-time progress tracking during PDF loading</li>
                   </ul>
                 </div>
@@ -330,12 +337,12 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <strong className="text-blue-400">Latest Release:</strong>
                       </p>
                       <a 
-                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.7" 
+                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.8" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
                       >
-                        v0.1.7 (October 2026)
+                        v0.1.8 (October 2026)
                       </a>
                     </div>
                     <div>
@@ -346,23 +353,23 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Windows: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive.Setup.0.1.7.exe" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive.Setup.0.1.8.exe" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive Setup 0.1.7.exe
+                            WebPressive Setup 0.1.8.exe
                           </a>
                         </div>
                         <div>
                           <span className="text-neutral-400">Linux: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive-0.1.7.AppImage" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive-0.1.8.AppImage" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive-0.1.7.AppImage
+                            WebPressive-0.1.8.AppImage
                           </a>
                         </div>
                       </div>

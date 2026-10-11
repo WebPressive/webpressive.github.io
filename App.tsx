@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Plus, Minus, Eye } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { SlideData, AppMode, SyncMessage, ZoomState, Annotation, AnnotationMap, AnnotationTool, MediaFile, MediaMap, CameraSettings, AudienceState } from './types';
 import UploadScreen, { LoadedMedia } from './components/UploadScreen';
 import Controls from './components/Controls';
@@ -18,12 +18,18 @@ import CameraPanel from './components/CameraPanel';
 import RecordingPanel from './components/RecordingPanel';
 import RecordingIndicator from './components/RecordingIndicator';
 import PlaybackView from './components/PlaybackView';
+import TranscriptPane from './components/TranscriptPane';
+import SpeakerNotesPane from './components/SpeakerNotesPane';
+import NextSlidePane from './components/NextSlidePane';
+import CaptionBar from './components/CaptionBar';
 import { renderPageAtZoom } from './utils/pdfUtils';
 import { buildMediaMap, preloadMedia, revokeMediaMap, resolveMediaFiles } from './utils/mediaUtils';
 import { createWheelStepper } from './utils/wheelNavigation';
 import { loadCameraSettings, storeCameraSettings, useCameraStream } from './utils/camera';
 import { useTalkRecording } from './utils/useTalkRecording';
 import { useRecordingExport } from './utils/useRecordingExport';
+import { useLiveTranscript } from './utils/useLiveTranscript';
+import { BLOCK_NAMES, BlockId, DockId, Edge, TRANSCRIPT_FONT_SIZES, usePresenterLayout } from './utils/presenterLayout';
 import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, ANNOTATION_HISTORY_LIMIT, ANNOTATION_STORAGE_KEY } from './constants';
 import { clsx } from 'clsx';
 
@@ -36,6 +42,7 @@ const getAnnotationStorageKey = (slides: SlideData[]): string | null => {
 };
 
 const NO_ANNOTATIONS: Annotation[] = []; // Stable empty list, so "no ink" is not a change on every render
+const CAPTION_HOLD_MS = 5000; // Captions stay this long after the speaker stops
 
 const loadStoredAnnotations = (key: string): AnnotationMap => {
   try {
@@ -130,10 +137,21 @@ const App: React.FC = () => {
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const receiverWindowRef = useRef<Window | null>(null);
   
-  // Resizable panels state
-  const [mainWidth, setMainWidth] = useState(66.67); // Percentage
-  const [nextHeight, setNextHeight] = useState(60); // Percentage of sidebar
-  const [isResizing, setIsResizing] = useState<string | null>(null);
+  // Live transcript (W): speech recognition on this computer. Off at the start of every session, like the camera.
+  const [isTranscriptOn, setIsTranscriptOn] = useState(false);
+
+  // Presenter view blocks (next slide, notes, transcript): moved by dragging their title bar into the sidebar,
+  // a strip above/below the current slide, or a floating window; every edge between sections resizes
+  const presenterContainerRef = useRef<HTMLDivElement>(null);
+  const presenterColumnRef = useRef<HTMLDivElement>(null);
+  const presenterLayout = usePresenterLayout({
+    container: presenterContainerRef,
+    column: presenterColumnRef,
+    isVisible: (id: BlockId) => id !== 'transcript' || isTranscriptOn,
+  });
+  const { layout } = presenterLayout;
+  const [isCaptionShared, setIsCaptionShared] = useState(false); // Captions on the audience view too
+  const transcriptFlushRef = useRef<() => Promise<void>>(() => Promise.resolve());
   
   // Refs for laser pointer containers
   const presenterSlideRef = useRef<HTMLDivElement>(null);
@@ -209,6 +227,7 @@ const App: React.FC = () => {
         } as SyncMessage);
         channel.postMessage({ type: 'ANNOTATIONS_SYNC', annotations } as SyncMessage);
         channel.postMessage(cameraSyncMessage());
+        channel.postMessage({ type: 'CAPTION_SYNC', text: audienceCaptionRef.current } as SyncMessage);
         if (mediaFiles.length > 0) {
           // Blobs are cloned across windows; the receiver makes its own object URLs
           channel.postMessage({ type: 'MEDIA_SYNC', files: mediaFiles } as SyncMessage);
@@ -321,7 +340,40 @@ const App: React.FC = () => {
     videoTrack: recordedVideoTrack,
     micDeviceId: cameraSettings.audioDeviceId,
     onNotice: (text: string) => setMediaNotice({ text, duration: 8000 }),
+    flushTranscript: () => transcriptFlushRef.current(),
   });
+  const transcript = useLiveTranscript({
+    enabled: !isReceiver && isTranscriptOn && slides.length > 0,
+    micDeviceId: cameraSettings.audioDeviceId,
+    muted: recording.isActive && recording.isMuted,
+    onFinal: recording.addTranscript, // Saved with the recording while one runs
+  });
+  transcriptFlushRef.current = transcript.flush;
+
+  // Captions: the last line and the one being spoken; cleared a few seconds after the speaker stops
+  const [liveCaption, setLiveCaption] = useState<string | null>(null);
+  useEffect(() => {
+    const last = transcript.lines[transcript.lines.length - 1]?.text ?? '';
+    const text = isTranscriptOn ? `${last} ${transcript.preview ?? ''}`.trim() : '';
+    setLiveCaption(text || null);
+    if (!text || transcript.preview) return;
+    const timer = setTimeout(() => setLiveCaption(null), CAPTION_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [transcript.lines, transcript.preview, isTranscriptOn]);
+  const audienceCaption = isCaptionShared ? liveCaption : null;
+  const audienceCaptionRef = useRef(audienceCaption);
+  audienceCaptionRef.current = audienceCaption;
+  useEffect(() => {
+    if (!isReceiver && broadcastChannelRef.current && mode !== AppMode.UPLOAD) {
+      broadcastChannelRef.current.postMessage({ type: 'CAPTION_SYNC', text: audienceCaption } as SyncMessage);
+    }
+  }, [audienceCaption, mode, isReceiver]);
+  // A transcript that cannot start says why (in the presenter view the pane shows it too)
+  useEffect(() => {
+    if (transcript.error && isTranscriptOn && !isDualScreen) setMediaNotice({ text: transcript.error, duration: 8000 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcript.error]);
+
   const recordingExport = useRecordingExport(slides, mediaMap, deckName, (text: string) => setMediaNotice({ text, duration: 8000 }));
 
   // Broadcast state changes
@@ -837,46 +889,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [isSpotlightActive, isLaserActive, mode, isDualScreen]);
 
-  // Resize handlers (must be before any conditional returns)
-  const handleResizeStart = useCallback((type: string) => {
-    setIsResizing(type);
-  }, []);
-  
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(null);
-  }, []);
-  
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    if (isResizing === 'vertical') {
-      const sidebar = document.querySelector('.presenter-sidebar') as HTMLElement;
-      if (sidebar) {
-        const rect = sidebar.getBoundingClientRect();
-        const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
-        setNextHeight(Math.max(20, Math.min(80, newHeight)));
-      }
-    } else if (isResizing === 'horizontal') {
-      const container = document.querySelector('.presenter-container') as HTMLElement;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
-        setMainWidth(Math.max(40, Math.min(80, newWidth)));
-      }
-    }
-  }, [isResizing]);
-  
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
-  }, [isResizing, handleMouseMove, handleResizeEnd]);
-
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1087,6 +1099,11 @@ const App: React.FC = () => {
           // Presenter camera on the slides on/off
           if (mode === AppMode.PRESENTATION) toggleCamera();
           break;
+        case 'w':
+        case 'W':
+          // Live transcript on/off
+          if (mode === AppMode.PRESENTATION) setIsTranscriptOn(!isTranscriptOn);
+          break;
         case 'm':
         case 'M':
           // Animations (GIF/video over poster stills) on/off
@@ -1255,7 +1272,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia, isBlackScreen, toggleCamera, isCameraPanelOpen, isRecordingPanelOpen, recording, isPaused, playback]);
+  }, [mode, nextSlide, prevSlide, toggleOverview, toggleSpotlight, toggleLaser, toggleDualScreen, isSpotlightActive, isLaserActive, applyZoom, resetZoom, isRegionSelecting, showAbout, zoomState, currentSlideIndex, laserPosition, slides.length, overviewHighlightIndex, selectSlide, isDualScreen, startTime, togglePause, toggleAnnotate, isAnnotating, undoAnnotation, redoAnnotation, clearSlideAnnotations, clearAllAnnotations, toggleMedia, isBlackScreen, toggleCamera, isCameraPanelOpen, isRecordingPanelOpen, recording, isPaused, playback, isTranscriptOn]);
 
   // Mouse wheel: Shift + wheel zooms (Mode B); the plain wheel moves one slide per scroll gesture.
   // No slide change while zoomed, drawing, in the about dialog, or over the speaker notes (which scroll).
@@ -1284,6 +1301,7 @@ const App: React.FC = () => {
       }
       if (e.ctrlKey) return; // Trackpad pinch: leave it to the browser
       if (speakerNotesRef.current?.contains(e.target as Node)) return; // The notes panel scrolls itself
+      if ((e.target as Element | null)?.closest?.('[data-transcript-pane]')) return; // So does the transcript
       e.preventDefault();
       wheelStepperRef.current?.(e);
     };
@@ -1750,17 +1768,99 @@ const App: React.FC = () => {
   // --- Presenter View (Dual Screen Active) ---
   if (isDualScreen && mode === AppMode.PRESENTATION) {
     const nextIndex = Math.min(currentSlideIndex + 1, slides.length - 1);
+    const sideBlocks = presenterLayout.shownIn('side');
+    const topBlocks = presenterLayout.shownIn('top');
+    const bottomBlocks = presenterLayout.shownIn('bottom');
+    const floatingBlocks = (['next', 'notes', 'transcript'] as BlockId[]).filter(
+      (id) => layout.floating[id] && (id !== 'transcript' || isTranscriptOn)
+    );
+    const blockDrag = presenterLayout.drag;
+    type BlockExtra = { place: string; className?: string; style?: React.CSSProperties; children?: React.ReactNode };
+    const renderBlock = (id: BlockId, { place, className, style, children }: BlockExtra) => {
+      const common = {
+        className: clsx(className, blockDrag?.id === id && 'opacity-40'),
+        style,
+        headerProps: presenterLayout.moveHandleProps(id),
+        children,
+      };
+      if (id === 'next') return <NextSlidePane key={id} place={place} src={currentSlideIndex < slides.length - 1 ? slides[nextIndex].src : null} {...common} />;
+      if (id === 'notes')
+        return (
+          <SpeakerNotesPane
+            key={id}
+            place={place}
+            notes={slides[currentSlideIndex].notes}
+            slideName={slides[currentSlideIndex].name}
+            fontSize={speakerNotesFontSize}
+            isReadingGuideEnabled={isReadingGuideEnabled}
+            onToggleReadingGuide={toggleReadingGuide}
+            onDecreaseFontSize={decreaseFontSize}
+            onIncreaseFontSize={increaseFontSize}
+            scrollRef={speakerNotesRef}
+            {...common}
+          />
+        );
+      return (
+        <TranscriptPane
+          key={id}
+          place={place}
+          transcript={transcript}
+          fontSize={layout.fontSize}
+          showAudience={isCaptionShared}
+          onFontSize={(step) => {
+            const sizes = TRANSCRIPT_FONT_SIZES;
+            const at = sizes.findIndex((size) => size >= layout.fontSize);
+            const index = Math.max(0, Math.min(sizes.length - 1, (at < 0 ? sizes.length - 1 : at) + step));
+            presenterLayout.update({ fontSize: sizes[index] });
+          }}
+          onToggleAudience={() => setIsCaptionShared(!isCaptionShared)}
+          onClose={() => setIsTranscriptOn(false)}
+          {...common}
+        />
+      );
+    };
+    // An edge between sections: a wide grab area around a thin line (drag to resize, double-click to reset)
+    const edgeBar = (edge: Edge, vertical: boolean) => (
+      <div
+        key={`edge-${edge.kind}-${'dock' in edge ? edge.dock : ''}-${'after' in edge ? edge.after : ''}`}
+        {...presenterLayout.edgeProps(edge)}
+        className={clsx('flex-shrink-0 flex items-center justify-center group', vertical ? 'w-4 cursor-col-resize' : 'h-4 cursor-row-resize')}
+      >
+        <div className={clsx('rounded-full bg-neutral-700 group-hover:bg-blue-500 transition-colors', vertical ? 'w-1 h-full' : 'h-1 w-full')} />
+      </div>
+    );
+    // A place's blocks: stacked in the sidebar, side by side in a strip, each sharing the place by its weight
+    const renderDock = (dock: DockId, blocks: BlockId[]) => {
+      const horizontal = dock !== 'side';
+      const total = blocks.reduce((sum, id) => sum + layout.weights[id], 0);
+      // A percentage basis (padding included), shrunk evenly to make room for the edges between blocks
+      return blocks.map((id, i) => (
+        <React.Fragment key={id}>
+          {i > 0 && edgeBar({ kind: 'between', dock, after: blocks[i - 1] }, horizontal)}
+          {renderBlock(id, { place: dock, className: 'min-h-0 min-w-0', style: { flex: `0 1 ${(layout.weights[id] / total) * 100}%` } })}
+        </React.Fragment>
+      ));
+    };
     
     return (
       <div className={`w-full h-screen bg-neutral-900 text-white flex flex-col overflow-hidden ${isLaserActive ? 'cursor-none' : ''}`}>
         {/* Presenter Dashboard */}
-        <div className="flex-1 flex gap-4 p-4 h-full presenter-container">
+        <div ref={presenterContainerRef} className="flex-1 min-h-0 flex p-4 h-full presenter-container">
             
-            {/* Main Slide (Left, Resizable) */}
+          {/* Current slide column, with the strips above/below it; the full width when the sidebar is empty */}
+          <div ref={presenterColumnRef} className="flex-1 flex flex-col min-w-0">
+            {topBlocks.length > 0 && (
+              <>
+                <div data-dock="top" className="flex flex-row flex-shrink-0 min-h-0" style={{ height: `${layout.topHeight}%` }}>
+                  {renderDock('top', topBlocks)}
+                </div>
+                {edgeBar({ kind: 'strip', dock: 'top' }, false)}
+              </>
+            )}
+            {/* Main Slide */}
             <div 
               ref={presenterSlideRef}
-              className={`bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700 ${isLaserActive ? 'cursor-none' : ''}`}
-              style={{ width: `${mainWidth}%` }}
+              className={`flex-1 min-h-0 bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-neutral-700 ${isLaserActive ? 'cursor-none' : ''}`}
             >
                <div className="relative w-full h-full flex items-center justify-center overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '100%' }}>
                  <img 
@@ -1829,131 +1929,62 @@ const App: React.FC = () => {
                  />
                </div>
             </div>
-            
-            {/* Resize Handle (Vertical) */}
-            <div
-              className="w-1 bg-neutral-700 hover:bg-blue-500 cursor-col-resize transition-colors flex items-center justify-center group"
-              onMouseDown={() => handleResizeStart('horizontal')}
-            >
-              <div className="w-0.5 h-16 bg-neutral-600 group-hover:bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+            {bottomBlocks.length > 0 && (
+              <>
+                {edgeBar({ kind: 'strip', dock: 'bottom' }, false)}
+                <div data-dock="bottom" className="flex flex-row flex-shrink-0 min-h-0" style={{ height: `${layout.bottomHeight}%` }}>
+                  {renderDock('bottom', bottomBlocks)}
+                </div>
+              </>
+            )}
+          </div>
 
-            {/* Sidebar (Next Slide + Info, Resizable) */}
-            <div 
-              className="flex flex-col gap-4 presenter-sidebar"
-              style={{ width: `${100 - mainWidth}%` }}
-            >
-                {/* Next Slide Preview (Resizable Height) */}
-                <div 
-                  className="bg-black rounded-2xl relative flex items-center justify-center border border-neutral-700 overflow-hidden"
-                  style={{ height: `${nextHeight}%` }}
-                >
-                    {currentSlideIndex < slides.length - 1 ? (
-                        <img 
-                          src={slides[nextIndex].src} 
-                          className="max-w-full max-h-full object-contain opacity-75"
-                          alt="Next slide"
-                        />
-                    ) : (
-                        <div className="text-neutral-500">End of presentation</div>
-                    )}
-                    <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full text-sm font-mono text-green-400 border border-green-500/30">
-                        NEXT
-                    </div>
-                </div>
-                
-                {/* Resize Handle (Horizontal) */}
-                <div
-                  className="h-1 bg-neutral-700 hover:bg-blue-500 cursor-row-resize transition-colors flex items-center justify-center group"
-                  onMouseDown={() => handleResizeStart('vertical')}
-                >
-                  <div className="h-0.5 w-16 bg-neutral-600 group-hover:bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-
-                {/* Info Panel / Notes (Resizable Height) */}
-                <div 
-                  className="bg-neutral-800 rounded-2xl p-6 flex flex-col border border-neutral-700 overflow-hidden"
-                  style={{ height: `${100 - nextHeight}%` }}
-                >
-                    <div 
-                      ref={speakerNotesRef}
-                      className="flex-1 overflow-y-auto pr-2 relative" 
-                      style={{
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: '#525252 #262626'
-                      }}
-                    >
-                        <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-3 sticky top-0 bg-neutral-800 pb-2 z-20">Speaker Notes</h2>
-                        {/* Fixed Reading Guide Highlight - Stays at first line of text */}
-                        {isReadingGuideEnabled && (
-                            <div 
-                                className="sticky left-0 right-2 pointer-events-none z-10"
-                                style={{
-                                    top: '32px', // Position after heading (approx heading height)
-                                    height: `${speakerNotesFontSize * 1.625}px`, // Match line height
-                                    backgroundColor: 'rgba(156, 163, 175, 0.15)',
-                                    borderTop: '1px solid rgba(156, 163, 175, 0.3)',
-                                    borderBottom: '1px solid rgba(156, 163, 175, 0.3)',
-                                    marginBottom: `-${speakerNotesFontSize * 1.625}px` // Pull next content up under highlight
-                                }}
-                            />
-                        )}
-                        {slides[currentSlideIndex].notes ? (
-                            <div 
-                                className="text-neutral-200 whitespace-pre-wrap leading-relaxed" 
-                                style={{ 
-                                    fontSize: `${speakerNotesFontSize}px`,
-                                    paddingBottom: isReadingGuideEnabled ? '80%' : '0' // Allow last line to scroll to highlight
-                                }}
-                            >
-                                {slides[currentSlideIndex].notes}
-                            </div>
-                        ) : (
-                            <p className="text-neutral-500 italic" style={{ fontSize: `${speakerNotesFontSize}px` }}>No notes available for this slide.</p>
-                        )}
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-neutral-700 flex-shrink-0">
-                        <div className="flex items-end justify-between">
-                            <div className="flex-1 min-w-0">
-                                <h2 className="text-neutral-400 text-xs font-bold uppercase tracking-wider mb-1">Current Slide</h2>
-                                <p className="text-neutral-300 truncate" style={{ fontSize: `${speakerNotesFontSize}px` }}>{slides[currentSlideIndex].name}</p>
-                            </div>
-                            <div className="flex items-center gap-1 ml-4">
-                                <button
-                                    onClick={toggleReadingGuide}
-                                    className={clsx(
-                                        "p-1.5 rounded-md transition-colors",
-                                        isReadingGuideEnabled 
-                                            ? "bg-neutral-700 text-neutral-200" 
-                                            : "hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200"
-                                    )}
-                                    title={isReadingGuideEnabled ? "Disable reading guide" : "Enable reading guide"}
-                                    aria-label={isReadingGuideEnabled ? "Disable reading guide" : "Enable reading guide"}
-                                >
-                                    <Eye size={16} />
-                                </button>
-                                <button
-                                    onClick={decreaseFontSize}
-                                    className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors text-neutral-400 hover:text-neutral-200"
-                                    title="Decrease font size"
-                                    aria-label="Decrease font size"
-                                >
-                                    <Minus size={16} />
-                                </button>
-                                <button
-                                    onClick={increaseFontSize}
-                                    className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors text-neutral-400 hover:text-neutral-200"
-                                    title="Increase font size"
-                                    aria-label="Increase font size"
-                                >
-                                    <Plus size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          {/* Sidebar beside the slide (Resizable), while it holds a block */}
+          {sideBlocks.length > 0 && (
+            <>
+              {edgeBar({ kind: 'side' }, true)}
+              <div data-dock="side" className="flex flex-col presenter-sidebar min-w-0 flex-shrink-0" style={{ width: `${layout.sideWidth}%` }}>
+                {renderDock('side', sideBlocks)}
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Floating blocks: drag the title bar to move (double-click: back to the sidebar), the corner to resize */}
+        {floatingBlocks.map((id) => {
+          // Kept on screen (the window may have been made smaller since it was placed)
+          const saved = layout.floating[id]!;
+          const rect = { ...saved, x: Math.max(0, Math.min(saved.x, 1 - saved.w)), y: Math.max(0, Math.min(saved.y, 0.92)) };
+          return renderBlock(id, {
+            place: 'floating',
+            className: clsx('fixed', id === 'transcript' ? 'z-[66]' : 'z-[65]'),
+            style: { left: `${rect.x * 100}vw`, top: `${rect.y * 100}vh`, width: `${rect.w * 100}vw`, height: `${rect.h * 100}vh` },
+            children: (
+              <div
+                {...presenterLayout.floatResizeProps(id)}
+                className="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize z-30"
+                style={{ touchAction: 'none', background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.35) 50%)' }}
+              />
+            ),
+          });
+        })}
+
+        {/* While a block is dragged: where it will land, and its name at the pointer */}
+        {blockDrag?.preview && (
+          <div
+            data-drop-preview={blockDrag.target?.kind === 'dock' ? blockDrag.target.dock : 'floating'}
+            className="fixed z-[90] pointer-events-none rounded-2xl border-2 border-blue-400 bg-blue-500/15 transition-all duration-75"
+            style={blockDrag.preview}
+          />
+        )}
+        {blockDrag && (
+          <div
+            className="fixed z-[91] pointer-events-none px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold shadow-lg"
+            style={{ left: blockDrag.x + 12, top: blockDrag.y + 12 }}
+          >
+            {BLOCK_NAMES[blockDrag.id]}
+          </div>
+        )}
 
         {/* Controls Bar */}
         <div className="h-20 bg-neutral-900 border-t border-neutral-700 flex items-center justify-center">
@@ -1978,6 +2009,8 @@ const App: React.FC = () => {
                 onCameraClick={toggleCameraPanel}
                 isRecording={recording.isActive}
                 onRecordClick={toggleRecordingPanel}
+                isTranscriptOn={isTranscriptOn}
+                onTranscriptClick={() => setIsTranscriptOn(!isTranscriptOn)}
                 toggleDualScreen={toggleDualScreen}
                 nextSlide={nextSlide}
                 prevSlide={prevSlide}
@@ -2065,6 +2098,15 @@ const App: React.FC = () => {
       </AnimatePresence>
       {/* Outside the per-slide fade, so the camera stays steady through slide changes */}
       {renderCameraOverlay(normalViewRef)}
+      {/* One screen: the transcript shows as captions (everything here is seen by the audience) */}
+      {mode === AppMode.PRESENTATION && <CaptionBar text={isTranscriptOn ? liveCaption : null} />}
+      {isTranscriptOn && !transcript.isListening && !transcript.error && (
+        <div className="absolute top-4 right-4 z-[60] px-3 py-1.5 rounded-lg bg-neutral-900/85 text-xs text-neutral-300 pointer-events-none" data-transcript-status="">
+          {transcript.status === 'ready'
+            ? 'Transcript: opening the microphone…'
+            : `Transcript: loading the speech model${transcript.progress > 0 && transcript.progress < 1 ? ` (${Math.round(transcript.progress * 100)}%)` : ''}…`}
+        </div>
+      )}
 
       <Controls
         currentSlide={currentSlideIndex}
@@ -2087,6 +2129,8 @@ const App: React.FC = () => {
         onCameraClick={toggleCameraPanel}
         isRecording={recording.isActive}
         onRecordClick={toggleRecordingPanel}
+        isTranscriptOn={isTranscriptOn}
+        onTranscriptClick={() => setIsTranscriptOn(!isTranscriptOn)}
         toggleDualScreen={toggleDualScreen}
         nextSlide={nextSlide}
         prevSlide={prevSlide}

@@ -20,6 +20,7 @@ const ReceiverView: React.FC = () => {
   const [isMediaActive, setIsMediaActive] = useState(true);
   const [isBlackScreen, setIsBlackScreen] = useState(false);
   const [cameraSync, setCameraSync] = useState<Extract<SyncMessage, { type: 'CAMERA_SYNC' }> | null>(null);
+  const [caption, setCaption] = useState<string | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null); // For forwarding keys and wheel steps to the presenter
   const mediaMapRef = useRef<MediaMap>({}); // For revoking on replace/unmount
 
@@ -81,6 +82,8 @@ const ReceiverView: React.FC = () => {
         setAnnotationDraft({ index: msg.index, annotation: msg.annotation });
       } else if (msg.type === 'CAMERA_SYNC') {
         setCameraSync(msg);
+      } else if (msg.type === 'CAPTION_SYNC') {
+        setCaption(msg.text);
       } else if (msg.type === 'MEDIA_SYNC') {
         // Object URLs from the presenter window are not usable here; make our own from the Blobs
         revokeMediaMap(mediaMapRef.current);
@@ -181,6 +184,7 @@ const ReceiverView: React.FC = () => {
       draft={annotationDraft.index === currentIndex ? annotationDraft.annotation : null}
       mediaMap={mediaMap}
       camera={{ settings: cameraSync?.settings ?? DEFAULT_CAMERA_SETTINGS, stream: cameraStream }}
+      caption={caption}
     />
   );
 };

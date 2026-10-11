@@ -8,17 +8,17 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 ## 📦 Downloads
 
-**Latest Release: [v0.1.7](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.7)** (October 2026)
+**Latest Release: [v0.1.8](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.8)** (October 2026)
 
 Download the desktop application for your platform:
 
-- **Windows**: [WebPressive Setup 0.1.7.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive.Setup.0.1.7.exe) (105 MB)
-- **Linux**: [WebPressive-0.1.7.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.7/WebPressive-0.1.7.AppImage) (144 MB)
+- **Windows**: [WebPressive Setup 0.1.8.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive.Setup.0.1.8.exe) (108 MB)
+- **Linux**: [WebPressive-0.1.8.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive-0.1.8.AppImage) (148 MB)
 
 ### Installation
 
 - **Windows**: Run the installer and follow the setup wizard
-- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.7.AppImage`) and run it
+- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.8.AppImage`) and run it
 
 For release notes and more information, visit the [Releases page](https://github.com/WebPressive/webpressive.github.io/releases).
 
@@ -26,11 +26,12 @@ For release notes and more information, visit the [Releases page](https://github
 
 - **Dual-Screen Mode**: Open a synchronized receiver window for projector displays
 - **PDF Import**: Load Beamer PDF presentations with real-time progress tracking
-- **Speaker Notes**: Automatically extracts and displays speaker notes from Beamer PDFs
+- **Speaker Notes**: Automatically extracts and displays speaker notes from Beamer PDFs; drag the notes and the next-slide preview beside, above or below the current slide, or into a floating window
 - **Embedded Links**: Clickable links from PDFs are preserved and functional
 - **Animated GIFs & Videos**: Play GIF, MP4 or WebM files over their poster stills, marked in Beamer with a `wpmedia:` link
 - **Presenter Camera**: Show your webcam on the slides, on both screens (circle, rounded or rectangle; any corner, size, or dragged into place; per-slide placement from Beamer with a `wpcamera:` link)
 - **Talk Recording**: Record your talk (voice, slides, ink, laser, zoom and camera), re-record single slides, play it back, and download it as a video or audio only
+- **Live Transcript** (off until you press **W**): What you say, written out live on your computer (English), as a presenter-view block like the notes; optional captions for the audience; saved with recordings as captions and subtitles
 - **Zoom & Pan**: Multiple zoom modes with smooth panning
   - Fixed zoom levels (50%, 100%, 150%, 200%)
   - Continuous zoom with mouse wheel
@@ -132,6 +133,7 @@ The production build uses Nginx to serve the optimized static files.
 - **L**: Toggle laser pointer
 - **D**: Toggle dual-screen mode (receiver window)
 - **V**: Show/hide your camera on the slides (see [Presenter Camera](#presenter-camera))
+- **W**: Live transcript on/off (see [Live Transcript](#live-transcript))
 - **F**: Toggle fullscreen
 - **F5**: Fullscreen (a clicker's "start slideshow" button; the page is not reloaded)
 - **B** or **.**: Black screen on the projector; the next navigation key brings the slide back
@@ -184,6 +186,8 @@ Open a synchronized receiver window that displays the current slide on a second 
 
 ### Speaker Notes
 WebPressive automatically extracts speaker notes from Beamer PDFs. Notes are displayed in the presenter view sidebar and can be scrolled if they are long.
+
+**Arrange the presenter view:** drag the speaker notes by their title bar, or the next-slide preview anywhere on it, and drop it **beside the slide** (the sidebar), **above** or **below the current slide**, or anywhere else for a **floating window**. A blue outline shows where it will land. Blocks above or below the slide sit side by side; with nothing left in the sidebar, the current slide uses the whole width. Every edge between sections resizes (double-click it to reset); a floating window resizes from its corner, and double-clicking its title bar puts it back in the sidebar. The arrangement and the sizes are remembered.
 
 **Demo Presentation with Speaker Notes:**
 The demo presentation uses the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template) (included as a Git submodule), which includes comprehensive speaker notes demonstrating how to structure and embed notes in LaTeX Beamer presentations. The template shows:
@@ -312,8 +316,18 @@ Each slide visit is saved as its own clip. In the recording panel, the selected 
 **Download:** tick recordings in the panel and press **Download**, or use the download button in the player.
 - **Video**: everything the audience saw, with your camera and voice, at 1080p or 720p. It is an MP4 (H.264) where the browser can encode it (Chrome and Edge on Windows and macOS, the desktop app), otherwise a WebM. Creating the file takes a while for a long talk; keep the window open.
 - **Audio only**: your voice as M4A, or Ogg where M4A is not available.
+- **Subtitles (.srt)** and **Transcript (.txt)**: what you said, when the [live transcript](#live-transcript) was on while recording.
 
 Recordings are stored in this browser on this computer (IndexedDB) and never uploaded. Clearing the site's data in the browser deletes them, so download the ones you want to keep.
+
+### Live Transcript
+Press **W** (or the captions button in the control bar) and WebPressive writes out what you say as you speak. It is off until you turn it on.
+
+- **On your computer**: speech recognition runs in the browser or the desktop app (the Moonshine model, English). The first time, it downloads a 28 MB model, kept for next time; after that it starts offline. Your voice is never uploaded. It uses the microphone chosen in the camera settings, and is off whenever WebPressive starts.
+- **Where it shows** (dual-screen mode): in the sidebar at first; drag its title bar like the speaker notes to put it beside, above or below the current slide (next to the other blocks there), or into a floating window.
+- The line being spoken shows in grey and is replaced by the final text after a short pause. **+**/**−** set the text size; scroll back to read earlier text.
+- **Captions for the audience**: the screen button in the transcript's title bar shows the last line as captions on the projector. On a single screen the transcript is shown as captions.
+- **With a recording**: while the transcript is on, the text is saved with the recording. The player shows it as captions (**C** or the captions button), and the download menu offers **Subtitles (.srt)**, timed to the downloaded video, and a **Transcript (.txt)** by slide. Muting the recording also pauses the transcript.
 
 ### Progress Indicator
 When loading a PDF, a progress bar shows the current processing status with page-by-page feedback.

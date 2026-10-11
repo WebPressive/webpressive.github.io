@@ -7,6 +7,7 @@ import LinkOverlay from './LinkOverlay';
 import AnnotationLayer from './AnnotationLayer';
 import MediaOverlay from './MediaOverlay';
 import CameraOverlay from './CameraOverlay';
+import CaptionBar from './CaptionBar';
 import { clsx } from 'clsx';
 
 interface AudienceViewProps {
@@ -21,6 +22,7 @@ interface AudienceViewProps {
     video?: React.ReactNode; // Recorded camera clip (playback)
     hidden?: boolean;
   };
+  caption?: string | null; // Captions at the bottom (live transcript or a recording's)
   className?: string; // Marks the container (e.g. 'receiver-container')
 }
 
@@ -29,7 +31,7 @@ interface AudienceViewProps {
  * Pure display, driven by props: the projector window feeds it live state, recording playback feeds
  * it a recorded timeline.
  */
-const AudienceView: React.FC<AudienceViewProps> = ({ slides, state, annotations, draft, mediaMap, camera, className }) => {
+const AudienceView: React.FC<AudienceViewProps> = ({ slides, state, annotations, draft, mediaMap, camera, caption, className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const slide = slides[state.index] ?? slides[0];
   const { zoomState } = state;
@@ -137,6 +139,7 @@ const AudienceView: React.FC<AudienceViewProps> = ({ slides, state, annotations,
         panX={zoomState.panX}
         panY={zoomState.panY}
       />
+      {state.mode === AppMode.PRESENTATION && <CaptionBar text={caption} />}
       {/* Black screen (B or . on the presenter or a clicker) */}
       {state.isBlackScreen && <div className="fixed inset-0 z-[70] bg-black" aria-label="Black screen" />}
     </div>
