@@ -145,6 +145,10 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                           <span>Pause/Resume timer (and the recording)</span>
                         </div>
                         <div className="flex items-center gap-2">
+                          <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">O</kbd>
+                          <span>Show/hide the menu (presenter view: also the bottom edge)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <kbd className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 text-xs">Escape</kbd>
                           <span>Exit current mode</span>
                         </div>
@@ -337,12 +341,12 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <strong className="text-blue-400">Latest Release:</strong>
                       </p>
                       <a 
-                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.8" 
+                        href="https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.9" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
                       >
-                        v0.1.8 (October 2026)
+                        v0.1.9 (October 2026)
                       </a>
                     </div>
                     <div>
@@ -353,23 +357,23 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                           <span className="text-neutral-400">Windows: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive.Setup.0.1.8.exe" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.9/WebPressive.Setup.0.1.9.exe" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive Setup 0.1.8.exe
+                            WebPressive Setup 0.1.9.exe
                           </a>
                         </div>
                         <div>
                           <span className="text-neutral-400">Linux: </span>
                           <a 
-                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive-0.1.8.AppImage" 
+                            href="https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.9/WebPressive-0.1.9.AppImage" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            WebPressive-0.1.8.AppImage
+                            WebPressive-0.1.9.AppImage
                           </a>
                         </div>
                       </div>

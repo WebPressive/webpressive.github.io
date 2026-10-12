@@ -8,17 +8,17 @@ A dual-screen presenter for LaTeX Beamer PDFs.
 
 ## 📦 Downloads
 
-**Latest Release: [v0.1.8](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.8)** (October 2026)
+**Latest Release: [v0.1.9](https://github.com/WebPressive/webpressive.github.io/releases/tag/v0.1.9)** (October 2026)
 
 Download the desktop application for your platform:
 
-- **Windows**: [WebPressive Setup 0.1.8.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive.Setup.0.1.8.exe) (108 MB)
-- **Linux**: [WebPressive-0.1.8.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.8/WebPressive-0.1.8.AppImage) (148 MB)
+- **Windows**: [WebPressive Setup 0.1.9.exe](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.9/WebPressive.Setup.0.1.9.exe) (108 MB)
+- **Linux**: [WebPressive-0.1.9.AppImage](https://github.com/WebPressive/webpressive.github.io/releases/download/v0.1.9/WebPressive-0.1.9.AppImage) (148 MB)
 
 ### Installation
 
 - **Windows**: Run the installer and follow the setup wizard
-- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.8.AppImage`) and run it
+- **Linux**: Make the AppImage executable (`chmod +x WebPressive-0.1.9.AppImage`) and run it
 
 For release notes and more information, visit the [Releases page](https://github.com/WebPressive/webpressive.github.io/releases).
 
@@ -27,6 +27,7 @@ For release notes and more information, visit the [Releases page](https://github
 - **Dual-Screen Mode**: Open a synchronized receiver window for projector displays
 - **PDF Import**: Load Beamer PDF presentations with real-time progress tracking
 - **Speaker Notes**: Automatically extracts and displays speaker notes from Beamer PDFs; drag the notes and the next-slide preview beside, above or below the current slide, or into a floating window
+- **Pacing Timer**: Under the next-slide preview, the time on this slide against its share of the script (its notes at your speaking rate) and the talk time against the whole script, with how far behind or ahead you are; green, amber and red show the pace at a glance
 - **Embedded Links**: Clickable links from PDFs are preserved and functional
 - **Animated GIFs & Videos**: Play GIF, MP4 or WebM files over their poster stills, marked in Beamer with a `wpmedia:` link
 - **Presenter Camera**: Show your webcam on the slides, on both screens (circle, rounded or rectangle; any corner, size, or dragged into place; per-slide placement from Beamer with a `wpcamera:` link)
@@ -139,6 +140,7 @@ The production build uses Nginx to serve the optimized static files.
 - **B** or **.**: Black screen on the projector; the next navigation key brings the slide back
 - **A**: Show about dialog (works in dual-screen mode)
 - **P**: Pause/Resume presentation timer (and the recording, while recording)
+- **O**: Show/hide the menu (in the presenter view it stays hidden until called: also the bottom edge of the window, or the small tab there)
 - **M**: Toggle animations (GIFs/videos) on/off (see [Animated GIFs & Videos](#animated-gifs--videos))
 - **Escape**: Exit current mode (overview, spotlight, laser, or region zoom)
 
@@ -154,6 +156,7 @@ The production build uses Nginx to serve the optimized static files.
 ### Timer Controls
 - **P**: Pause/Resume presentation timer (and the recording, while recording)
 - **Click clock**: Reset timer to 00:00
+- **Click the pacing timer** (presenter view): speaking rate, time for slides without notes, where the talk ends, pause, restart (see [Pacing Timer](#pacing-timer))
 
 ### Zoom Controls
 - **1**: Zoom to 50%
@@ -188,6 +191,19 @@ Open a synchronized receiver window that displays the current slide on a second 
 WebPressive automatically extracts speaker notes from Beamer PDFs. Notes are displayed in the presenter view sidebar and can be scrolled if they are long.
 
 **Arrange the presenter view:** drag the speaker notes by their title bar, or the next-slide preview anywhere on it, and drop it **beside the slide** (the sidebar), **above** or **below the current slide**, or anywhere else for a **floating window**. A blue outline shows where it will land. Blocks above or below the slide sit side by side; with nothing left in the sidebar, the current slide uses the whole width. Every edge between sections resizes (double-click it to reset); a floating window resizes from its corner, and double-clicking its title bar puts it back in the sidebar. The arrangement and the sizes are remembered.
+
+### Pacing Timer
+In dual-screen mode, a timer sits under the next-slide preview:
+
+- **Slide** `0:12 / 0:25`: time on this slide (all visits, without pauses) / its budget.
+- **Total** `3:40 / 8:50  +0:15`: talk time / the script's length, and how far behind (**+**) or ahead (**−**) of the schedule you are. Within a slide's budget the offset holds still; it grows once the slide runs over.
+- **Colors**: green on time, amber a little over (a slide 25 % or 10 s over; the talk 8 % or 45 s late), red beyond, blue well ahead.
+
+How the budgets are made:
+- A slide's budget is its notes' word count at your **speaking rate** (default 130 words per minute); a slide without notes gets a fixed time (default 15 s).
+- Animation steps that repeat the same note share one budget; steps with their own notes (one note per click) are timed separately.
+- Put `[time: 1:30]` (or `[time: 90s]`, `[time: 2m]`) in a slide's notes to set its time; the tag is not shown in the notes panel.
+- **Backup slides** after the talk's end do not count towards the total. By default the talk ends before the PDF's *Appendix* bookmark (Beamer's `\appendix`); click the timer and choose **Ends on this slide** to change it. It is remembered per PDF.
 
 **Demo Presentation with Speaker Notes:**
 The demo presentation uses the [HRG Beamer Template](https://github.com/bankh/hrg-beamer-template) (included as a Git submodule), which includes comprehensive speaker notes demonstrating how to structure and embed notes in LaTeX Beamer presentations. The template shows:

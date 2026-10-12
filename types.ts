@@ -50,6 +50,7 @@ export interface SlideData {
   links?: PDFLink[]; // Embedded links from PDF
   media?: PDFMedia[]; // Animated media regions (wpmedia: links)
   camera?: SlideCamera; // Camera placement for this slide (wpcamera: link)
+  appendix?: boolean; // From the PDF's Appendix bookmark (Beamer \appendix) on: backup slides, not timed in the talk
 }
 
 // --- Presenter camera (shown on the slides) ---

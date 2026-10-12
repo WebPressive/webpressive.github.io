@@ -21,6 +21,7 @@ import PlaybackView from './components/PlaybackView';
 import TranscriptPane from './components/TranscriptPane';
 import SpeakerNotesPane from './components/SpeakerNotesPane';
 import NextSlidePane from './components/NextSlidePane';
+import PaceTimer from './components/PaceTimer';
 import CaptionBar from './components/CaptionBar';
 import { renderPageAtZoom } from './utils/pdfUtils';
 import { buildMediaMap, preloadMedia, revokeMediaMap, resolveMediaFiles } from './utils/mediaUtils';
@@ -29,6 +30,7 @@ import { loadCameraSettings, storeCameraSettings, useCameraStream } from './util
 import { useTalkRecording } from './utils/useTalkRecording';
 import { useRecordingExport } from './utils/useRecordingExport';
 import { useLiveTranscript } from './utils/useLiveTranscript';
+import { PaceSettings, buildPlan, defaultTalkEnd, loadPaceSettings, loadTalkEnd, parseTimeTag, savePaceSettings, saveTalkEnd, useUnitClock } from './utils/pacing';
 import { BLOCK_NAMES, BlockId, DockId, Edge, TRANSCRIPT_FONT_SIZES, usePresenterLayout } from './utils/presenterLayout';
 import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, ANNOTATION_HISTORY_LIMIT, ANNOTATION_STORAGE_KEY } from './constants';
 import { clsx } from 'clsx';
@@ -297,6 +299,27 @@ const App: React.FC = () => {
     setAnnotationDraft(null);
     loadedAnnotationKeyRef.current = annotationStorageKey;
   }, [annotationStorageKey]);
+
+  // Pacing: each slide's time from its notes, the talk's end (per deck; backup slides follow it), and the
+  // time spent on the current slide. Shown under the next slide in the presenter view.
+  const [paceSettings, setPaceSettings] = useState<PaceSettings>(loadPaceSettings);
+  const [talkEndChoice, setTalkEndChoice] = useState<number | null>(null);
+  useEffect(() => setTalkEndChoice(loadTalkEnd(annotationStorageKey)), [annotationStorageKey]);
+  const talkEnd: number = Math.min(talkEndChoice ?? defaultTalkEnd(slides), Math.max(0, slides.length - 1));
+  const pacePlan = useMemo(() => buildPlan(slides, paceSettings, talkEnd), [slides, paceSettings, talkEnd]);
+  const paceUnit: number = pacePlan.unitOf[currentSlideIndex] ?? 0;
+  const paceUnitMs = useUnitClock(paceUnit, startTime, isPaused);
+  const changePaceSettings = useCallback((settings: PaceSettings) => {
+    setPaceSettings(settings);
+    savePaceSettings(settings);
+  }, []);
+  const changeTalkEnd = useCallback((value: number | null) => {
+    setTalkEndChoice(value);
+    saveTalkEnd(annotationStorageKey, value);
+  }, [annotationStorageKey]);
+
+  // Presenter view: O calls the menu (bumped to show it, or hide it when shown)
+  const [menuRequest, setMenuRequest] = useState(0);
 
   useEffect(() => {
     // The ref check skips the commit in which a new presentation's annotations are still being loaded
@@ -1109,6 +1132,11 @@ const App: React.FC = () => {
           // Animations (GIF/video over poster stills) on/off
           if (mode === AppMode.PRESENTATION) toggleMedia();
           break;
+        case 'o':
+        case 'O':
+          // The menu (in the presenter view it stays hidden until called)
+          if (mode === AppMode.PRESENTATION) setMenuRequest((n: number) => n + 1);
+          break;
         case 'p':
         case 'P':
           if (mode !== AppMode.PRESENTATION) break;
@@ -1783,13 +1811,39 @@ const App: React.FC = () => {
         headerProps: presenterLayout.moveHandleProps(id),
         children,
       };
-      if (id === 'next') return <NextSlidePane key={id} place={place} src={currentSlideIndex < slides.length - 1 ? slides[nextIndex].src : null} {...common} />;
+      if (id === 'next')
+        return (
+          <NextSlidePane
+            key={id}
+            place={place}
+            src={currentSlideIndex < slides.length - 1 ? slides[nextIndex].src : null}
+            footer={
+              <PaceTimer
+                plan={pacePlan}
+                unit={paceUnit}
+                unitMs={paceUnitMs}
+                startTime={startTime}
+                pausedTime={pausedTime}
+                pauseStartTime={isPaused ? pauseStartTime : null}
+                settings={paceSettings}
+                onSettings={changePaceSettings}
+                talkEnd={talkEnd}
+                onTalkEnd={changeTalkEnd}
+                currentIndex={currentSlideIndex}
+                slideCount={slides.length}
+                onTogglePause={togglePause}
+                onReset={resetTimer}
+              />
+            }
+            {...common}
+          />
+        );
       if (id === 'notes')
         return (
           <SpeakerNotesPane
             key={id}
             place={place}
-            notes={slides[currentSlideIndex].notes}
+            notes={parseTimeTag(slides[currentSlideIndex].notes).text}
             slideName={slides[currentSlideIndex].name}
             fontSize={speakerNotesFontSize}
             isReadingGuideEnabled={isReadingGuideEnabled}
@@ -1986,37 +2040,37 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Controls Bar */}
-        <div className="h-20 bg-neutral-900 border-t border-neutral-700 flex items-center justify-center">
-            <Controls
-                currentSlide={currentSlideIndex}
-                totalSlides={slides.length}
-                mode={mode}
-                isSpotlight={isSpotlightActive}
-                isLaser={isLaserActive}
-                startTime={startTime}
-                zoomLevel={zoomState.level}
-                isPaused={isPaused}
-                pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
-                togglePause={togglePause}
-                resetTimer={resetTimer}
-                toggleOverview={toggleOverview}
-                toggleSpotlight={toggleSpotlight}
-                toggleLaser={toggleLaser}
-                isAnnotating={isAnnotating}
-                toggleAnnotate={toggleAnnotate}
-                isCameraOn={isCameraOn}
-                onCameraClick={toggleCameraPanel}
-                isRecording={recording.isActive}
-                onRecordClick={toggleRecordingPanel}
-                isTranscriptOn={isTranscriptOn}
-                onTranscriptClick={() => setIsTranscriptOn(!isTranscriptOn)}
-                toggleDualScreen={toggleDualScreen}
-                nextSlide={nextSlide}
-                prevSlide={prevSlide}
-                onAboutClick={() => setShowAbout(true)}
-            />
-        </div>
+        {/* Menu: hidden until called (bottom edge, its tab, or O), then it slides up over the content */}
+        <Controls
+          reveal="edge"
+          openRequest={menuRequest}
+          currentSlide={currentSlideIndex}
+          totalSlides={slides.length}
+          mode={mode}
+          isSpotlight={isSpotlightActive}
+          isLaser={isLaserActive}
+          startTime={startTime}
+          zoomLevel={zoomState.level}
+          isPaused={isPaused}
+          pausedTime={pausedTime + (pauseStartTime ? Date.now() - pauseStartTime : 0)}
+          togglePause={togglePause}
+          resetTimer={resetTimer}
+          toggleOverview={toggleOverview}
+          toggleSpotlight={toggleSpotlight}
+          toggleLaser={toggleLaser}
+          isAnnotating={isAnnotating}
+          toggleAnnotate={toggleAnnotate}
+          isCameraOn={isCameraOn}
+          onCameraClick={toggleCameraPanel}
+          isRecording={recording.isActive}
+          onRecordClick={toggleRecordingPanel}
+          isTranscriptOn={isTranscriptOn}
+          onTranscriptClick={() => setIsTranscriptOn(!isTranscriptOn)}
+          toggleDualScreen={toggleDualScreen}
+          nextSlide={nextSlide}
+          prevSlide={prevSlide}
+          onAboutClick={() => setShowAbout(true)}
+        />
 
         {annotationToolbar}
         {cameraPanel}
@@ -2135,6 +2189,7 @@ const App: React.FC = () => {
         nextSlide={nextSlide}
         prevSlide={prevSlide}
         onAboutClick={() => setShowAbout(true)}
+        openRequest={menuRequest}
       />
 
       {isBlackScreen && (

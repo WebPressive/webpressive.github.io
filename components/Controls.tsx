@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Maximize, Minimize, Grid, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play, Video, Circle, Captions } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Maximize, Minimize, Grid, ChevronUp, Sun, ChevronLeft, ChevronRight, Clock, Monitor, MousePointer2, PenLine, Info, Pause, Play, Video, Circle, Captions } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppMode } from '../types';
 
@@ -31,7 +31,14 @@ interface ControlsProps {
   prevSlide: () => void;
   onAboutClick?: () => void;
   isReceiver?: boolean; // If true, hide interactive controls except fullscreen
+  // 'pointer': any pointer move shows the menu. 'edge' (presenter view): hidden until called by the
+  // bottom edge, the tab there, or `openRequest`; then it slides up over the content.
+  reveal?: 'pointer' | 'edge';
+  openRequest?: number; // Bumped (O key) to show the menu, or hide it when shown
 }
+
+const HIDE_DELAY = 3000; // ms after the pointer leaves (or stops moving, with 'pointer')
+const EDGE_ZONE = 24; // px from the window's bottom edge that call the menu
 
 const Controls: React.FC<ControlsProps> = ({
   currentSlide,
@@ -60,27 +67,48 @@ const Controls: React.FC<ControlsProps> = ({
   nextSlide,
   prevSlide,
   onAboutClick,
-  isReceiver = false
+  isReceiver = false,
+  reveal = 'pointer',
+  openRequest = 0
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [elapsed, setElapsed] = useState("00:00");
-  const [opacity, setOpacity] = useState(0);
+  const [isShown, setIsShown] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const isOverMenuRef = useRef(false);
+
+  // Shows the menu, hiding it again after a while (unless the pointer is on it)
+  const show = (delay = HIDE_DELAY) => {
+    setIsShown(true);
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => !isOverMenuRef.current && setIsShown(false), delay);
+  };
 
   // Auto-hide controls logic
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    const show = () => {
-      setOpacity(1);
-      clearTimeout(timeout);
-      timeout = setTimeout(() => setOpacity(0), 3000);
+    const onMove = (e: MouseEvent) => {
+      if (reveal === 'pointer' || isOverMenuRef.current || e.clientY >= window.innerHeight - EDGE_ZONE) show();
     };
-
-    window.addEventListener('mousemove', show);
+    window.addEventListener('mousemove', onMove);
     return () => {
-      window.removeEventListener('mousemove', show);
-      clearTimeout(timeout);
+      window.removeEventListener('mousemove', onMove);
+      clearTimeout(hideTimerRef.current);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal]);
+
+  // O: show the menu (a little longer, as the pointer may be elsewhere), or hide it
+  useEffect(() => {
+    if (!openRequest) return;
+    if (isShown) {
+      clearTimeout(hideTimerRef.current);
+      isOverMenuRef.current = false;
+      setIsShown(false);
+    } else {
+      show(5000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
 
   // Timer logic (accounts for paused time)
   useEffect(() => {
@@ -128,12 +156,40 @@ const Controls: React.FC<ControlsProps> = ({
         />
       </div>
 
+      {/* Presenter view: the tab that calls the menu, at the bottom edge */}
+      {reveal === 'edge' && (
+        <button
+          data-menu-tab
+          onClick={() => show()}
+          className={clsx(
+            "fixed bottom-1 left-1/2 -translate-x-1/2 z-40 w-12 h-3 flex items-center justify-center rounded-t-md",
+            "bg-neutral-700/80 hover:bg-blue-600 text-neutral-300 transition-opacity duration-300",
+            isShown || mode === AppMode.OVERVIEW ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}
+          title="Menu (O)"
+          aria-label="Show the menu"
+        >
+          <ChevronUp className="w-3 h-3" />
+        </button>
+      )}
+
       {/* Floating Controls */}
       <div 
+        data-controls={isShown || mode === AppMode.OVERVIEW ? 'shown' : 'hidden'}
+        onMouseEnter={() => {
+          isOverMenuRef.current = true;
+          clearTimeout(hideTimerRef.current);
+        }}
+        onMouseLeave={() => {
+          isOverMenuRef.current = false;
+          show();
+        }}
         className={clsx(
           "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center space-x-2",
-          "bg-neutral-900/90 backdrop-blur-md border border-white/10 p-2 rounded-2xl shadow-2xl transition-opacity duration-300",
-          mode === AppMode.OVERVIEW ? "opacity-100" : (opacity === 0 ? "opacity-0 pointer-events-none" : "opacity-100")
+          "bg-neutral-900/90 backdrop-blur-md border border-white/10 p-2 rounded-2xl shadow-2xl transition-all duration-300",
+          mode === AppMode.OVERVIEW || isShown
+            ? "opacity-100 translate-y-0"
+            : clsx("opacity-0 pointer-events-none", reveal === 'edge' && "translate-y-[calc(100%+1.5rem)]")
         )}
       >
         <button onClick={prevSlide} className="p-2 hover:bg-white/10 rounded-xl transition-colors" title="Previous (Left Arrow)">

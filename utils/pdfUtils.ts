@@ -16,6 +16,7 @@ export interface PDFPageData {
   links?: PDFLink[]; // Embedded links
   media?: PDFMedia[]; // Animated media regions
   camera?: SlideCamera; // Camera placement (wpcamera: link)
+  appendix?: boolean; // At or after the Appendix bookmark
 }
 
 // Store for notes loaded from PDF metadata
@@ -385,6 +386,19 @@ export async function extractPagesFromPDF(
     console.debug('Metadata extraction failed:', e);
   }
   
+  // Where the appendix starts (1-based): a top-level "Appendix" or "Backup..." bookmark, as Beamer's \appendix makes
+  let appendixPage = Infinity;
+  try {
+    const outline = await pdf.getOutline();
+    const entry = (outline ?? []).find((item: { title?: string }) => /^\s*(appendix|backup)\b/i.test(item.title ?? ''));
+    if (entry?.dest) {
+      const dest = typeof entry.dest === 'string' ? await pdf.getDestination(entry.dest) : entry.dest;
+      if (Array.isArray(dest) && dest[0]) appendixPage = (await pdf.getPageIndex(dest[0])) + 1;
+    }
+  } catch (e) {
+    console.debug('Outline extraction failed:', e);
+  }
+
   // Use provided scale or calculate optimal scale
   const renderScale = scale ?? calculateOptimalScale();
 
@@ -468,6 +482,7 @@ export async function extractPagesFromPDF(
       links,
       media,
       camera,
+      appendix: pageNum >= appendixPage,
     });
 
     // Report progress after each page is processed
@@ -509,6 +524,8 @@ export async function pdfToSlides(
     media: page.media,
     // Store the camera placement
     camera: page.camera,
+    // Backup slides (Appendix bookmark on)
+    appendix: page.appendix,
   }));
 }
 
